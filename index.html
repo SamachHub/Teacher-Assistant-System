@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>ระบบผู้ช่วยคุณครู — โรงเรียนวันทามาเรีย ราชบุรี</title>
+<title>ระบบผู้ช่วยคุณครู — โรงเรียนวันทามารีอา ราชบุรี</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -370,24 +370,32 @@ function defaultState(){
     attendance: {},
     gradeConfig: {},
     behavior: {},
+    settings: { gsheetUrl:'', lastBackup:null },
   };
 }
 
+const LS_KEY = 'watamaria-teacher-app-data-v1';
+function hasClaudeStorage(){
+  return typeof window.storage !== 'undefined' && window.storage && typeof window.storage.get === 'function';
+}
 async function loadState(){
+  let raw = null;
+  try{ raw = localStorage.getItem(LS_KEY); }catch(e){ raw = null; }
+  if(!raw && hasClaudeStorage()){
+    try{ const res = await window.storage.get('app-data', false); if(res && res.value) raw = res.value; }catch(e){}
+  }
   try{
-    const res = await window.storage.get('app-data', false);
-    if(res && res.value){
-      const parsed = JSON.parse(res.value);
-      // merge in any new default classes/students without clobbering edits
-      const def = defaultState();
-      parsed.roster = parsed.roster || def.roster;
-      parsed.classNames = parsed.classNames || def.classNames;
+    if(raw){
+      const parsed = JSON.parse(raw);
+      parsed.roster = parsed.roster || defaultState().roster;
+      parsed.classNames = parsed.classNames || Object.keys(parsed.roster);
       parsed.subjects = parsed.subjects || [];
       parsed.assignments = parsed.assignments || {};
       parsed.scores = parsed.scores || {};
       parsed.attendance = parsed.attendance || {};
       parsed.gradeConfig = parsed.gradeConfig || {};
       parsed.behavior = parsed.behavior || {};
+      parsed.settings = parsed.settings || { gsheetUrl:'', lastBackup:null };
       STATE = parsed;
     } else {
       STATE = defaultState();
@@ -397,12 +405,26 @@ async function loadState(){
   }
 }
 
+function persistNow(){
+  const json = JSON.stringify(STATE);
+  let ok = false;
+  try{ localStorage.setItem(LS_KEY, json); ok = true; }catch(e){ console.error('localStorage save failed', e); }
+  if(hasClaudeStorage()){
+    try{ window.storage.set('app-data', json, false); }catch(e){ /* ignore, localStorage already covers persistence */ }
+  }
+  return ok;
+}
 function saveState(){
   clearTimeout(SAVE_TIMER);
-  SAVE_TIMER = setTimeout(async ()=>{
-    try{ await window.storage.set('app-data', JSON.stringify(STATE), false); }
-    catch(e){ console.error('save failed', e); showToast('บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง'); }
-  }, 250);
+  SAVE_TIMER = setTimeout(()=>{
+    const ok = persistNow();
+    if(!ok) showToast('บันทึกไม่สำเร็จ — เบราว์เซอร์อาจปิดการใช้งานพื้นที่จัดเก็บข้อมูล');
+  }, 200);
+}
+function flushSaveNow(msg){
+  clearTimeout(SAVE_TIMER);
+  const ok = persistNow();
+  showToast(ok ? (msg || 'บันทึกข้อมูลเรียบร้อยแล้ว ✓') : 'บันทึกไม่สำเร็จ — เบราว์เซอร์อาจปิดการใช้งานพื้นที่จัดเก็บข้อมูล');
 }
 
 /* ================= Toast ================= */
@@ -430,7 +452,7 @@ function renderShell(){
     <div class="topbar">
       <img src="data:image/jpeg;base64,${window.LOGO_B64}" alt="โลโก้โรงเรียน">
       <div class="titles">
-        <div class="school">โรงเรียนวันทามาเรีย ราชบุรี</div>
+        <div class="school">โรงเรียนวันทามารีอา ราชบุรี</div>
         <div class="sub">ระบบผู้ช่วยคุณครูประจำชั้น</div>
       </div>
     </div>
@@ -499,6 +521,7 @@ function pageDashboard(){
   return `
   <div class="page-head">
     <div><h1>ภาพรวม & จัดการข้อมูล</h1><div class="desc">จัดการรายชื่อนักเรียนและรายวิชา — หน้าแรกหลังเข้าสู่ระบบ</div></div>
+    <button class="btn btn-primary" onclick="flushSaveNow()">💾 บันทึก</button>
   </div>
 
   <div class="stat-grid">
@@ -509,13 +532,18 @@ function pageDashboard(){
   </div>
 
   <div class="card">
-    <h3>📚 รายวิชา</h3>
-    <div class="row" style="margin-bottom:12px;">
-      ${STATE.subjects.map(sub=>`
-        <span class="chip gold">${esc(sub.name)} <button class="link-btn" style="margin:0;padding:0 0 0 4px;color:#7A5C1E" onclick="deleteSubject('${sub.id}')">✕</button></span>
-      `).join('') || '<span class="hint">ยังไม่มีรายวิชา — เพิ่มรายวิชาแรกของคุณด้านล่าง</span>'}
+    <div class="row" style="justify-content:space-between;flex-wrap:wrap;">
+      <h3 style="margin:0;">🔒 สำรองข้อมูลไป Google Sheet</h3>
+      <button class="link-btn" onclick="openGSheetHelpModal()">วิธีตั้งค่า</button>
     </div>
-    <button class="btn btn-primary btn-sm" onclick="openAddSubjectModal()">+ เพิ่มรายวิชาใหม่</button>
+    <div class="row" style="margin-top:10px;">
+      <div class="field" style="flex:1;min-width:220px;">
+        <label>Google Apps Script Web App URL</label>
+        <input class="txt" id="gsheetUrlInput" placeholder="https://script.google.com/macros/s/xxxx/exec" value="${esc(STATE.settings.gsheetUrl||'')}" onchange="setGSheetUrl(this.value)">
+      </div>
+      <button class="btn btn-gold" onclick="backupToGoogleSheet()">📤 สำรองข้อมูลตอนนี้</button>
+    </div>
+    <div class="hint" style="margin-top:8px;">${STATE.settings.lastBackup? 'สำรองข้อมูลล่าสุด: '+new Date(STATE.settings.lastBackup).toLocaleString('th-TH') : 'ยังไม่เคยสำรองข้อมูล'}</div>
   </div>
 
   <div class="card">
@@ -590,6 +618,74 @@ function deleteSubject(id){
   STATE.subjects = STATE.subjects.filter(s=>s.id!==id);
   delete STATE.assignments[id]; delete STATE.scores[id]; delete STATE.gradeConfig[id];
   saveState(); refresh();
+}
+
+/* ---- Google Sheet backup ---- */
+function setGSheetUrl(val){
+  STATE.settings.gsheetUrl = val.trim();
+  saveState(); showToast('บันทึก URL แล้ว');
+}
+async function backupToGoogleSheet(){
+  const url = STATE.settings.gsheetUrl;
+  if(!url){ showToast('กรุณาใส่ Google Apps Script URL ก่อน'); openGSheetHelpModal(); return; }
+  showToast('กำลังส่งข้อมูลสำรอง...');
+  try{
+    const json = JSON.stringify(STATE);
+    const chunkSize = 40000;
+    const chunks = [];
+    for(let i=0;i<json.length;i+=chunkSize) chunks.push(json.slice(i,i+chunkSize));
+    await fetch(url, {
+      method:'POST',
+      mode:'no-cors',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify({ timestamp: new Date().toISOString(), chunks })
+    });
+    STATE.settings.lastBackup = new Date().toISOString();
+    saveState();
+    showToast('สำรองข้อมูลไปยัง Google Sheet แล้ว ✓');
+    refresh();
+  }catch(e){
+    console.error(e);
+    showToast('ส่งข้อมูลไม่สำเร็จ ตรวจสอบ URL ที่ตั้งค่าไว้');
+  }
+}
+const APPS_SCRIPT_CODE = `function doPost(e) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Backups') || ss.insertSheet('Backups');
+  var data = JSON.parse(e.postData.contents);
+  var row = [data.timestamp].concat(data.chunks);
+  sheet.appendRow(row);
+  return ContentService.createTextOutput(JSON.stringify({status:'ok'}))
+    .setMimeType(ContentService.MimeType.JSON);
+}`;
+function openGSheetHelpModal(){
+  openModal(`
+    <h3>วิธีตั้งค่าสำรองข้อมูลไป Google Sheet</h3>
+    <ol style="font-size:13.5px;line-height:1.9;padding-right:6px;">
+      <li>สร้าง Google Sheet ใหม่ (ไฟล์ว่างๆ)</li>
+      <li>ไปที่เมนู <b>ส่วนขยาย (Extensions) → Apps Script</b></li>
+      <li>ลบโค้ดเดิมทั้งหมด แล้ววางโค้ดด้านล่างนี้แทน</li>
+      <li>กด <b>Deploy → New deployment</b> เลือกประเภท <b>Web app</b><br>ตั้งค่า Execute as: <b>Me</b>, Who has access: <b>Anyone</b></li>
+      <li>กด Deploy แล้วคัดลอก URL ที่ได้ (ลงท้ายด้วย /exec) มาวางในช่อง URL ที่หน้าภาพรวม</li>
+    </ol>
+    <div class="field" style="margin:10px 0;">
+      <label>โค้ด Apps Script (คัดลอกไปวาง)</label>
+      <textarea class="txt" id="appsScriptCode" readonly style="min-height:140px;font-family:monospace;font-size:11.5px;resize:vertical;">${esc(APPS_SCRIPT_CODE)}</textarea>
+    </div>
+    <div class="row" style="justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="closeModal()">ปิด</button>
+      <button class="btn btn-primary" onclick="copyAppsScript()">คัดลอกโค้ด</button>
+    </div>
+  `);
+}
+function copyAppsScript(){
+  const ta = document.getElementById('appsScriptCode');
+  ta.select(); ta.setSelectionRange(0,999999);
+  try{
+    navigator.clipboard.writeText(APPS_SCRIPT_CODE).then(()=>showToast('คัดลอกโค้ดแล้ว')).catch(()=>{ document.execCommand('copy'); showToast('คัดลอกโค้ดแล้ว'); });
+  }catch(e){
+    document.execCommand('copy'); showToast('คัดลอกโค้ดแล้ว');
+  }
 }
 
 function openAddStudentModal(cls){
@@ -680,6 +776,7 @@ function pageAttendance(){
   return `
   <div class="page-head">
     <div><h1>เช็คชื่อ</h1><div class="desc">แตะสถานะของนักเรียนแต่ละคน — ค่าเริ่มต้นจะถูกบันทึกอัตโนมัติ</div></div>
+    <button class="btn btn-primary" onclick="flushSaveNow()">💾 บันทึก</button>
   </div>
 
   <div class="card">
@@ -694,7 +791,11 @@ function pageAttendance(){
           <input type="date" value="${date}" onchange="UI.attDate=this.value;refresh();">
         </div>
       </div>
-      <button class="btn btn-gold" onclick="markAllPresent('${esc(cls)}','${date}')">✅ มาครบทั้งหมด</button>
+      <div class="row">
+        <button class="btn btn-gold" onclick="markAllPresent('${esc(cls)}','${date}')">✅ มาครบทั้งหมด</button>
+        <button class="btn btn-danger" onclick="clearAttendanceAll('${esc(cls)}','${date}')">🗑️ ล้างข้อมูลทั้งหมด</button>
+        <button class="btn btn-outline" onclick="exportAttendance('${esc(cls)}')">📤 Export Excel/CSV</button>
+      </div>
     </div>
   </div>
 
@@ -719,6 +820,7 @@ function pageAttendance(){
         </div>
         <div class="status-btns">
           ${STATUS_DEFS.map(sd=>`<button class="st-btn ${rec.status===sd.key?sd.cls:''}" onclick="setAttendance('${esc(cls)}','${date}','${s.id}','${sd.key}')">${sd.short}</button>`).join('')}
+          ${rec.status? `<button class="st-btn" title="ล้างข้อมูลรายคน" onclick="clearAttendanceStudent('${esc(cls)}','${date}','${s.id}')">✕</button>` : ''}
         </div>
         ${rec.status && rec.status!=='present' ? `<input class="txt note-input" placeholder="หมายเหตุ (ระบุเหตุผล)" value="${esc(rec.note||'')}" oninput="setAttendanceNote('${esc(cls)}','${date}','${s.id}',this.value)">` : ''}
       </div>`;
@@ -746,6 +848,47 @@ function markAllPresent(cls,date){
   STATE.attendance[cls][date]=day;
   saveState(); showToast('ตั้งค่า "มา" ให้ทุกคนแล้ว'); refresh();
 }
+function clearAttendanceStudent(cls,date,sid){
+  if(STATE.attendance[cls] && STATE.attendance[cls][date]){
+    delete STATE.attendance[cls][date][sid];
+    saveState(); refresh();
+  }
+}
+function clearAttendanceAll(cls,date){
+  if(!confirm('ล้างข้อมูลเช็คชื่อทั้งหมดของวันที่นี้?')) return;
+  if(STATE.attendance[cls]) STATE.attendance[cls][date]={};
+  saveState(); showToast('ล้างข้อมูลแล้ว'); refresh();
+}
+function exportAttendance(cls){
+  const clsData = STATE.attendance[cls] || {};
+  const dates = Object.keys(clsData).filter(d=>Object.keys(clsData[d]||{}).length>0).sort();
+  if(dates.length===0){ showToast('ยังไม่มีข้อมูลเช็คชื่อให้ Export'); return; }
+  const roster = STATE.roster[cls]||[];
+  const header = ['เลขที่','รหัสประจำตัว','ชื่อ-นามสกุล', ...dates.map(d=>fmtDateTH(d))];
+  const rows = [header];
+  roster.forEach(s=>{
+    const row = [s.no, s.id, fullName(s)];
+    dates.forEach(d=>{
+      const rec = clsData[d][s.id];
+      row.push(rec && rec.status ? (statusDef(rec.status)?statusDef(rec.status).short:'') : '');
+    });
+    rows.push(row);
+  });
+  const notesRows = [['วันที่','เลขที่','ชื่อ-นามสกุล','สถานะ','หมายเหตุ']];
+  dates.forEach(d=>{
+    Object.keys(clsData[d]).forEach(sid=>{
+      const rec = clsData[d][sid];
+      if(rec && rec.note){
+        const s = roster.find(r=>r.id===sid);
+        notesRows.push([fmtDateTH(d), s?s.no:'', s?fullName(s):sid, statusDef(rec.status)?statusDef(rec.status).label:'', rec.note]);
+      }
+    });
+  });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'เช็คชื่อ');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(notesRows), 'หมายเหตุ');
+  XLSX.writeFile(wb, `เช็คชื่อ_${cls}.xlsx`.replace(/\//g,'-'));
+}
 
 /* =================================================================
    PAGE: SCORES (assignments)
@@ -753,7 +896,7 @@ function markAllPresent(cls,date){
 function pageScores(){
   if(STATE.subjects.length===0){
     return `<div class="page-head"><div><h1>เก็บคะแนนรายตัวชี้วัด/งานย่อย</h1></div></div>
-    <div class="empty-state"><div class="ic">📝</div>ยังไม่มีรายวิชา<br><button class="btn btn-primary" style="margin-top:14px;" onclick="goTab('dashboard')">ไปเพิ่มรายวิชาที่หน้าภาพรวม</button></div>`;
+    <div class="empty-state"><div class="ic">📝</div>ยังไม่มีรายวิชา<br><button class="btn btn-primary" style="margin-top:14px;" onclick="openAddSubjectModal()">+ เพิ่มรายวิชาใหม่</button></div>`;
   }
   if(!UI.scoreSubject || !STATE.subjects.find(s=>s.id===UI.scoreSubject)) UI.scoreSubject = STATE.subjects[0].id;
   const subject = STATE.subjects.find(s=>s.id===UI.scoreSubject);
@@ -768,11 +911,18 @@ function pageScores(){
   return `
   <div class="page-head">
     <div><h1>เก็บคะแนนรายตัวชี้วัด/งานย่อย</h1><div class="desc">สร้างงาน/แบบทดสอบ แล้วกรอกคะแนนแต่ละคนได้ทันที</div></div>
-    <button class="btn btn-outline" onclick="exportScores('${subject.id}','${esc(cls)}')">📤 Export Excel</button>
+    <div class="row">
+      <button class="btn btn-outline" onclick="openAddSubjectModal()">+ ไปเพิ่มรายวิชา</button>
+      <button class="btn btn-outline" onclick="exportScores('${subject.id}','${esc(cls)}')">📤 Export Excel</button>
+      <button class="btn btn-primary" onclick="flushSaveNow()">💾 บันทึก</button>
+    </div>
   </div>
 
   <div class="subject-tabs">
-    ${STATE.subjects.map(s=>`<button class="subject-tab ${s.id===subject.id?'active':''}" onclick="UI.scoreSubject='${s.id}';UI.scoreClass=null;refresh();">${esc(s.name)}</button>`).join('')}
+    ${STATE.subjects.map(s=>`<span class="subject-tab ${s.id===subject.id?'active':''}" style="display:inline-flex;align-items:center;gap:6px;padding-left:16px;">
+      <button style="background:none;border:none;padding:0;font:inherit;color:inherit;" onclick="UI.scoreSubject='${s.id}';UI.scoreClass=null;refresh();">${esc(s.name)}</button>
+      <button title="ลบรายวิชา" style="background:none;border:none;padding:0;color:inherit;opacity:.7;cursor:pointer;" onclick="deleteSubject('${s.id}')">✕</button>
+    </span>`).join('')}
   </div>
   <div class="class-tabs">
     ${subject.classes.map(c=>`<button class="class-tab ${c===cls?'active':''}" onclick="UI.scoreClass='${esc(c)}';refresh();">${esc(c)}</button>`).join('')}
@@ -791,19 +941,29 @@ function pageScores(){
     <table>
       <thead><tr>
         <th class="name-cell">นักเรียน</th>
-        ${assignments.map(a=>`<th>${esc(a.name)}<br><span style="font-weight:400;opacity:.85;">เต็ม ${a.max}</span> <button onclick="deleteAssignment('${subject.id}','${a.id}')" style="background:none;border:none;color:#fff;opacity:.7;cursor:pointer;">✕</button></th>`).join('')}
+        ${assignments.map(a=>`<th>${esc(a.name)}<br><span style="font-weight:400;opacity:.85;">เต็ม ${a.max}</span><br>
+          <button class="btn-sm" style="background:var(--gold);color:var(--navy-dark);border:none;border-radius:7px;padding:3px 7px;font-size:11px;margin-top:4px;" onclick="fillSameScore('${subject.id}','${esc(cls)}','${a.id}',${a.max})">🖊️ ใส่คะแนนเดียวกันทั้งหมด</button>
+          <button style="background:none;border:none;color:#fff;opacity:.7;cursor:pointer;" title="ลบงานนี้" onclick="deleteAssignment('${subject.id}','${a.id}')">✕</button>
+        </th>`).join('')}
         <th>รวม</th>
       </tr></thead>
       <tbody>
       ${roster.map(s=>{
         const srow = scoreData[s.id]||{};
         let sum=0, max=0;
-        assignments.forEach(a=>{ max+=a.max; const v=srow[a.id]; if(v!==undefined && v!=='') sum+=Number(v); });
+        assignments.forEach(a=>{ max+=a.max; const v=srow[a.id]; if(v!==undefined && v!=='' && v!=='PENDING') sum+=Number(v); });
         return `<tr>
           <td class="name-cell">${s.no}. ${esc(fullName(s))}</td>
           ${assignments.map(a=>{
-            const v = srow[a.id]!==undefined? srow[a.id] : '';
-            return `<td><input type="number" min="0" max="${a.max}" step="0.5" class="score-input" value="${v}" onchange="setScore('${subject.id}','${esc(cls)}','${s.id}','${a.id}',this.value,${a.max})"></td>`;
+            const v = srow[a.id];
+            if(v==='PENDING'){
+              return `<td><button class="chip" style="background:var(--amber-light);color:var(--amber);border:none;" title="คลิกเพื่อกรอกคะแนน" onclick="setScore('${subject.id}','${esc(cls)}','${s.id}','${a.id}','',${a.max})">⏳ ค้างส่ง</button></td>`;
+            }
+            const val = v!==undefined? v : '';
+            return `<td>
+              <input type="number" min="0" max="${a.max}" step="0.5" class="score-input" value="${val}" onchange="setScore('${subject.id}','${esc(cls)}','${s.id}','${a.id}',this.value,${a.max})">
+              <button title="ทำเครื่องหมายค้างส่งงาน" style="background:none;border:none;color:var(--amber);cursor:pointer;font-size:13px;vertical-align:middle;" onclick="markPending('${subject.id}','${esc(cls)}','${s.id}','${a.id}')">⏳</button>
+            </td>`;
           }).join('')}
           <td><b>${sum}/${max}</b></td>
         </tr>`;
@@ -812,6 +972,25 @@ function pageScores(){
     </table>
   </div>` : (roster.length? '' : `<div class="empty-state"><div class="ic">🧑‍🏫</div>ห้อง ${esc(cls)} ยังไม่มีนักเรียน</div>`)}
   `;
+}
+function fillSameScore(subjectId, cls, asgId, max){
+  const val = prompt(`กรอกคะแนนที่ต้องการใส่ให้ทุกคน (เต็ม ${max})`, '');
+  if(val===null) return;
+  const num = clamp(parseFloat(val)||0, 0, max);
+  if(!STATE.scores[subjectId]) STATE.scores[subjectId]={};
+  if(!STATE.scores[subjectId][cls]) STATE.scores[subjectId][cls]={};
+  (STATE.roster[cls]||[]).forEach(s=>{
+    if(!STATE.scores[subjectId][cls][s.id]) STATE.scores[subjectId][cls][s.id]={};
+    STATE.scores[subjectId][cls][s.id][asgId] = num;
+  });
+  saveState(); showToast(`ใส่คะแนน ${num} ให้ทุกคนแล้ว — แก้ไขรายคนได้ตามต้องการ`); refresh();
+}
+function markPending(subjectId, cls, sid, asgId){
+  if(!STATE.scores[subjectId]) STATE.scores[subjectId]={};
+  if(!STATE.scores[subjectId][cls]) STATE.scores[subjectId][cls]={};
+  if(!STATE.scores[subjectId][cls][sid]) STATE.scores[subjectId][cls][sid]={};
+  STATE.scores[subjectId][cls][sid][asgId] = 'PENDING';
+  saveState(); refresh();
 }
 function openAddAssignmentModal(subjectId){
   openModal(`
@@ -857,7 +1036,12 @@ function exportScores(subjectId, cls){
   roster.forEach(s=>{
     const srow = scoreData[s.id]||{};
     let sum=0;
-    const cells = assignments.map(a=>{ const v=srow[a.id]; if(v!==undefined&&v!=='') sum+=Number(v); return v===undefined?'':v; });
+    const cells = assignments.map(a=>{
+      const v=srow[a.id];
+      if(v==='PENDING') return 'ค้างส่ง';
+      if(v!==undefined&&v!=='') sum+=Number(v);
+      return v===undefined?'':v;
+    });
     rows.push([s.no, s.id, fullName(s), ...cells, sum]);
   });
   const ws = XLSX.utils.aoa_to_sheet(rows);
@@ -872,7 +1056,7 @@ function exportScores(subjectId, cls){
 function pageGrades(){
   if(STATE.subjects.length===0){
     return `<div class="page-head"><div><h1>คะแนนรวมและตัดเกรด</h1></div></div>
-    <div class="empty-state"><div class="ic">📊</div>ยังไม่มีรายวิชา<br><button class="btn btn-primary" style="margin-top:14px;" onclick="goTab('dashboard')">ไปเพิ่มรายวิชาที่หน้าภาพรวม</button></div>`;
+    <div class="empty-state"><div class="ic">📊</div>ยังไม่มีรายวิชา<br><button class="btn btn-primary" style="margin-top:14px;" onclick="goTab('scores')">ไปเพิ่มรายวิชาที่หน้าเก็บคะแนน</button></div>`;
   }
   if(!UI.gradeSubject || !STATE.subjects.find(s=>s.id===UI.gradeSubject)) UI.gradeSubject = STATE.subjects[0].id;
   const subject = STATE.subjects.find(s=>s.id===UI.gradeSubject);
@@ -893,7 +1077,10 @@ function pageGrades(){
   return `
   <div class="page-head">
     <div><h1>คะแนนรวมและตัดเกรด</h1><div class="desc">กำหนดสัดส่วนคะแนน แล้วระบบคำนวณเกรดให้อัตโนมัติ — เหมาะสำหรับใช้บนคอมพิวเตอร์</div></div>
-    <button class="btn btn-outline" onclick="exportGrades('${subject.id}','${esc(cls)}')">📤 Export Excel</button>
+    <div class="row">
+      <button class="btn btn-outline" onclick="exportGrades('${subject.id}','${esc(cls)}')">📤 Export Excel</button>
+      <button class="btn btn-primary" onclick="flushSaveNow()">💾 บันทึก</button>
+    </div>
   </div>
 
   <div class="subject-tabs">
@@ -932,9 +1119,12 @@ function pageGrades(){
         <tbody>
         ${roster.map(s=>{
           const srow = scoreData[s.id]||{};
-          let collectSum=0;
-          assignments.forEach(a=>{ const v=srow[a.id]; if(v!==undefined&&v!=='') collectSum+=Number(v); });
-          const collectPct = asgMaxSum>0 ? (collectSum/asgMaxSum)*Number(cfg.collectW) : 0;
+          let collectSum=0, collectMaxDone=0;
+          assignments.forEach(a=>{
+            const v=srow[a.id];
+            if(v!==undefined && v!=='' && v!=='PENDING'){ collectSum+=Number(v); collectMaxDone+=a.max; }
+          });
+          const collectPct = collectMaxDone>0 ? (collectSum/collectMaxDone)*Number(cfg.collectW) : 0;
           const mid = cfg.midScores[s.id]!==undefined? Number(cfg.midScores[s.id]) : '';
           const fin = cfg.finalScores[s.id]!==undefined? Number(cfg.finalScores[s.id]) : '';
           const midPct = mid!==''&&cfg.midMax>0 ? (mid/cfg.midMax)*Number(cfg.midW) : 0;
@@ -943,7 +1133,7 @@ function pageGrades(){
           const g = gradeFor(total);
           return `<tr>
             <td class="name-cell">${s.no}. ${esc(fullName(s))}</td>
-            <td>${round1(collectPct)} <span class="hint">(${collectSum}/${asgMaxSum})</span></td>
+            <td>${round1(collectPct)} <span class="hint">(${collectSum}/${collectMaxDone||0} ที่ให้คะแนนแล้ว)</span></td>
             <td><input type="number" min="0" max="${cfg.midMax}" class="score-input" value="${mid}" onchange="setMidFinal('${subject.id}','${esc(cls)}','mid','${s.id}',this.value,${cfg.midMax})"></td>
             <td><input type="number" min="0" max="${cfg.finalMax}" class="score-input" value="${fin}" onchange="setMidFinal('${subject.id}','${esc(cls)}','final','${s.id}',this.value,${cfg.finalMax})"></td>
             <td><b>${total}</b></td>
@@ -982,9 +1172,9 @@ function exportGrades(subjectId, cls){
   const rows = [['เลขที่','รหัสประจำตัว','ชื่อ-นามสกุล',`คะแนนเก็บ (${cfg.collectW}%)`,`กลางภาค /${cfg.midMax}`,`ปลายภาค /${cfg.finalMax}`,'รวม (100)','เกรด']];
   roster.forEach(s=>{
     const srow = scoreData[s.id]||{};
-    let collectSum=0;
-    assignments.forEach(a=>{ const v=srow[a.id]; if(v!==undefined&&v!=='') collectSum+=Number(v); });
-    const collectPct = asgMaxSum>0 ? (collectSum/asgMaxSum)*Number(cfg.collectW) : 0;
+    let collectSum=0, collectMaxDone=0;
+    assignments.forEach(a=>{ const v=srow[a.id]; if(v!==undefined&&v!==''&&v!=='PENDING'){ collectSum+=Number(v); collectMaxDone+=a.max; } });
+    const collectPct = collectMaxDone>0 ? (collectSum/collectMaxDone)*Number(cfg.collectW) : 0;
     const mid = cfg.midScores[s.id]!==undefined? Number(cfg.midScores[s.id]) : '';
     const fin = cfg.finalScores[s.id]!==undefined? Number(cfg.finalScores[s.id]) : '';
     const midPct = mid!==''&&cfg.midMax>0 ? (mid/cfg.midMax)*Number(cfg.midW) : 0;
@@ -1011,6 +1201,7 @@ function pageBehavior(){
   return `
   <div class="page-head">
     <div><h1>พฤติกรรมและการทำความดี</h1><div class="desc">บันทึกคะแนนจิตพิสัยด้วยหลักฐาน ไม่ต้องใช้ความรู้สึก</div></div>
+    <button class="btn btn-primary" onclick="flushSaveNow()">💾 บันทึก</button>
   </div>
   <div class="class-tabs">
     ${STATE.classNames.map(c=>`<button class="class-tab ${c===cls?'active':''}" onclick="UI.behClass='${esc(c)}';refresh();">${esc(c)}</button>`).join('')}
