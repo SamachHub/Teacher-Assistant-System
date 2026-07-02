@@ -620,25 +620,74 @@ function deleteSubject(id){
   saveState(); refresh();
 }
 
-/* ---- Google Sheet backup ---- */
+/* ---- Google Sheet backup (structured, readable tables) ---- */
 function setGSheetUrl(val){
   STATE.settings.gsheetUrl = val.trim();
   saveState(); showToast('บันทึก URL แล้ว');
+}
+function buildBackupSheets(){
+  const sheets = [];
+  STATE.classNames.forEach(cls=>{
+    const roster = STATE.roster[cls]||[];
+    const stats = attendanceStatsForClass(cls);
+    const subjectsForClass = STATE.subjects.filter(sub=>sub.classes.includes(cls));
+    const subjectMeta = subjectsForClass.map(sub=>{
+      const assignments = STATE.assignments[sub.id]||[];
+      const cfg = (STATE.gradeConfig[sub.id] && STATE.gradeConfig[sub.id][cls]) || {collectW:50,midW:20,finalW:30,midMax:20,finalMax:30,midScores:{},finalScores:{}};
+      return {sub, assignments, cfg};
+    });
+
+    const header = ['เลขที่','รหัสประจำตัว','ชื่อ-นามสกุล','เข้าเรียน (%)','จำนวนวันที่เช็คชื่อ','ขาด (วัน)','ลาป่วย (วัน)','ลากิจ (วัน)','มาสาย (วัน)','อื่นๆ (วัน)'];
+    subjectMeta.forEach(sm=>{
+      sm.assignments.forEach(a=> header.push(`[${sm.sub.name}] ${a.name} (เต็ม ${a.max})`));
+      header.push(`[${sm.sub.name}] คะแนนเก็บ (${sm.cfg.collectW}%)`);
+      header.push(`[${sm.sub.name}] กลางภาค (เต็ม ${sm.cfg.midMax})`);
+      header.push(`[${sm.sub.name}] ปลายภาค (เต็ม ${sm.cfg.finalMax})`);
+      header.push(`[${sm.sub.name}] รวม (100)`);
+      header.push(`[${sm.sub.name}] เกรด`);
+    });
+
+    const rows = [header];
+    roster.forEach(s=>{
+      const st = stats[s.id] || {total:0,absent:0,sick:0,personal:0,late:0,other:0};
+      const attPct = st.total ? Math.round(((st.total-st.absent)/st.total)*100) : '';
+      const row = [s.no, s.id, fullName(s), attPct, st.total, st.absent, st.sick, st.personal, st.late, st.other];
+      subjectMeta.forEach(sm=>{
+        const scoreData = ((STATE.scores[sm.sub.id]||{})[cls]) || {};
+        const srow = scoreData[s.id] || {};
+        let collectSum=0, collectMaxDone=0;
+        sm.assignments.forEach(a=>{
+          const v = srow[a.id];
+          if(v==='PENDING'){ row.push('ค้างส่ง'); }
+          else if(v!==undefined && v!==''){ row.push(v); collectSum+=Number(v); collectMaxDone+=a.max; }
+          else{ row.push(''); }
+        });
+        const collectPct = collectMaxDone>0 ? (collectSum/collectMaxDone)*Number(sm.cfg.collectW) : 0;
+        const mid = sm.cfg.midScores[s.id]!==undefined ? Number(sm.cfg.midScores[s.id]) : '';
+        const fin = sm.cfg.finalScores[s.id]!==undefined ? Number(sm.cfg.finalScores[s.id]) : '';
+        const midPct = mid!==''&&sm.cfg.midMax>0 ? (mid/sm.cfg.midMax)*Number(sm.cfg.midW) : 0;
+        const finPct = fin!==''&&sm.cfg.finalMax>0 ? (fin/sm.cfg.finalMax)*Number(sm.cfg.finalW) : 0;
+        const total = round1(collectPct+midPct+finPct);
+        const g = gradeFor(total);
+        row.push(round1(collectPct), mid, fin, total, g.grade);
+      });
+      rows.push(row);
+    });
+    sheets.push({ name: cls.replace(/[\/\\?*\[\]:]/g,'-').slice(0,90), rows });
+  });
+  return sheets;
 }
 async function backupToGoogleSheet(){
   const url = STATE.settings.gsheetUrl;
   if(!url){ showToast('กรุณาใส่ Google Apps Script URL ก่อน'); openGSheetHelpModal(); return; }
   showToast('กำลังส่งข้อมูลสำรอง...');
   try{
-    const json = JSON.stringify(STATE);
-    const chunkSize = 40000;
-    const chunks = [];
-    for(let i=0;i<json.length;i+=chunkSize) chunks.push(json.slice(i,i+chunkSize));
+    const sheets = buildBackupSheets();
     await fetch(url, {
       method:'POST',
       mode:'no-cors',
       headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body: JSON.stringify({ timestamp: new Date().toISOString(), chunks })
+      body: JSON.stringify({ timestamp: new Date().toISOString(), sheets })
     });
     STATE.settings.lastBackup = new Date().toISOString();
     saveState();
@@ -650,11 +699,29 @@ async function backupToGoogleSheet(){
   }
 }
 const APPS_SCRIPT_CODE = `function doPost(e) {
+  var payload = JSON.parse(e.postData.contents);
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName('Backups') || ss.insertSheet('Backups');
-  var data = JSON.parse(e.postData.contents);
-  var row = [data.timestamp].concat(data.chunks);
-  sheet.appendRow(row);
+
+  (payload.sheets || []).forEach(function(sh){
+    var sheet = ss.getSheetByName(sh.name);
+    if (!sheet) sheet = ss.insertSheet(sh.name);
+    sheet.clearContents();
+    if (sh.rows && sh.rows.length){
+      var numCols = sh.rows.reduce(function(m,r){ return Math.max(m, r.length); }, 1);
+      var normalized = sh.rows.map(function(r){
+        var row = r.slice();
+        while (row.length < numCols) row.push('');
+        return row;
+      });
+      sheet.getRange(1, 1, normalized.length, numCols).setValues(normalized);
+      sheet.setFrozenRows(1);
+    }
+  });
+
+  var meta = ss.getSheetByName('_สำรองข้อมูลล่าสุด') || ss.insertSheet('_สำรองข้อมูลล่าสุด');
+  meta.clearContents();
+  meta.getRange(1, 1, 1, 2).setValues([['สำรองข้อมูลล่าสุดเมื่อ', payload.timestamp]]);
+
   return ContentService.createTextOutput(JSON.stringify({status:'ok'}))
     .setMimeType(ContentService.MimeType.JSON);
 }`;
@@ -664,13 +731,14 @@ function openGSheetHelpModal(){
     <ol style="font-size:13.5px;line-height:1.9;padding-right:6px;">
       <li>สร้าง Google Sheet ใหม่ (ไฟล์ว่างๆ)</li>
       <li>ไปที่เมนู <b>ส่วนขยาย (Extensions) → Apps Script</b></li>
-      <li>ลบโค้ดเดิมทั้งหมด แล้ววางโค้ดด้านล่างนี้แทน</li>
+      <li>ลบโค้ดเดิมทั้งหมด แล้ววางโค้ดด้านล่างนี้แทน (หากเคยตั้งค่าไว้ก่อนหน้านี้ ให้แทนที่โค้ดเดิมด้วยโค้ดนี้เพื่อให้ข้อมูลอ่านง่ายขึ้น)</li>
       <li>กด <b>Deploy → New deployment</b> เลือกประเภท <b>Web app</b><br>ตั้งค่า Execute as: <b>Me</b>, Who has access: <b>Anyone</b></li>
       <li>กด Deploy แล้วคัดลอก URL ที่ได้ (ลงท้ายด้วย /exec) มาวางในช่อง URL ที่หน้าภาพรวม</li>
+      <li>ทุกครั้งที่กด "สำรองข้อมูลตอนนี้" ระบบจะสร้างชีตแยกตามห้องเรียน (เช่น ป.4-3, ป.6-1) แต่ละชีตมีคอลัมน์ เลขที่ / รหัสประจำตัว / ชื่อ-นามสกุล / ข้อมูลเช็คชื่อ / คะแนนแต่ละงานและคะแนนรวม-เกรดของแต่ละรายวิชาแยกกันชัดเจน และจะอัปเดตทับของเดิมทุกครั้ง (ไม่สะสมข้อมูลซ้ำ)</li>
     </ol>
     <div class="field" style="margin:10px 0;">
       <label>โค้ด Apps Script (คัดลอกไปวาง)</label>
-      <textarea class="txt" id="appsScriptCode" readonly style="min-height:140px;font-family:monospace;font-size:11.5px;resize:vertical;">${esc(APPS_SCRIPT_CODE)}</textarea>
+      <textarea class="txt" id="appsScriptCode" readonly style="min-height:160px;font-family:monospace;font-size:11.5px;resize:vertical;">${esc(APPS_SCRIPT_CODE)}</textarea>
     </div>
     <div class="row" style="justify-content:flex-end;">
       <button class="btn btn-outline" onclick="closeModal()">ปิด</button>
