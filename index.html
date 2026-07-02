@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>ระบบผู้ช่วยคุณครู — โรงเรียนวันทามาเรีย ราชบุรี</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --navy:#1B3A6B;
+  --navy-dark:#122747;
+  --navy-light:#2E5590;
+  --gold:#C9A15A;
+  --gold-light:#E8D8B0;
+  --cream:#F7F3EA;
+  --red:#B5342D;
+  --red-light:#F3DCDA;
+  --green:#3E7A4E;
+  --green-light:#DCEEE1;
+  --amber:#B8862E;
+  --amber-light:#F3E6C8;
+  --ink:#1F2430;
+  --ink-soft:#5B6270;
+  --line:#E4DECD;
+  --card:#FFFFFF;
+  --shadow: 0 1px 2px rgba(27,58,107,.06), 0 4px 16px rgba(27,58,107,.06);
+  --radius: 14px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:'Sarabun',sans-serif;
+  background:var(--cream);
+  color:var(--ink);
+  -webkit-tap-highlight-color: transparent;
+}
+h1,h2,h3,h4,.display{font-family:'Kanit',sans-serif;}
+button{font-family:inherit;cursor:pointer;}
+input,select,textarea{font-family:inherit;}
+#app{min-height:100vh;display:flex;flex-direction:column;}
+
+/* ---------- Top bar ---------- */
+.topbar{
+  background:linear-gradient(135deg,var(--navy) 0%, var(--navy-dark) 100%);
+  color:#fff;
+  padding:14px 20px;
+  display:flex;
+  align-items:center;
+  gap:14px;
+  box-shadow:var(--shadow);
+  position:sticky;top:0;z-index:50;
+}
+.topbar img{
+  width:44px;height:44px;border-radius:50%;
+  border:2px solid var(--gold);
+  background:#fff;object-fit:cover;
+  flex-shrink:0;
+}
+.topbar .titles{display:flex;flex-direction:column;line-height:1.25;min-width:0;}
+.topbar .school{font-family:'Kanit',sans-serif;font-weight:600;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.topbar .sub{font-size:12px;color:var(--gold-light);}
+
+/* ---------- Layout ---------- */
+.shell{flex:1;display:flex;min-height:0;}
+.sidenav{
+  width:230px;background:#fff;border-right:1px solid var(--line);
+  padding:16px 10px;flex-shrink:0;
+}
+.sidenav .navitem{
+  display:flex;align-items:center;gap:10px;
+  padding:12px 14px;border-radius:10px;color:var(--ink-soft);
+  font-weight:500;font-size:15px;margin-bottom:4px;
+  border:none;background:none;width:100%;text-align:right-ish;
+  transition:background .15s;
+}
+.sidenav .navitem .ic{font-size:19px;width:24px;text-align:center;}
+.sidenav .navitem:hover{background:var(--cream);}
+.sidenav .navitem.active{background:var(--navy);color:#fff;}
+.main{flex:1;min-width:0;padding:22px 26px 90px;overflow-y:auto;}
+
+/* Bottom nav for mobile */
+.bottomnav{
+  display:none;position:fixed;bottom:0;left:0;right:0;
+  background:#fff;border-top:1px solid var(--line);
+  box-shadow:0 -2px 12px rgba(0,0,0,.06);
+  z-index:50;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+.bottomnav-inner{display:flex;}
+.bottomnav .navitem{
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;
+  padding:8px 2px 10px;border:none;background:none;color:var(--ink-soft);
+  font-size:11px;font-weight:500;
+}
+.bottomnav .navitem .ic{font-size:21px;}
+.bottomnav .navitem.active{color:var(--navy);}
+.bottomnav .navitem.active .ic{color:var(--navy);}
+
+@media (max-width: 860px){
+  .sidenav{display:none;}
+  .bottomnav{display:block;}
+  .main{padding:14px 12px 84px;}
+  .topbar{padding:10px 14px;}
+}
+
+/* ---------- Common widgets ---------- */
+.page-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:18px;}
+.page-head h1{font-size:22px;margin:0;color:var(--navy-dark);}
+.page-head .desc{font-size:13px;color:var(--ink-soft);margin-top:2px;}
+
+.card{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:18px;box-shadow:var(--shadow);margin-bottom:16px;
+}
+.card h3{margin:0 0 12px;font-size:16px;color:var(--navy-dark);}
+
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+.field{display:flex;flex-direction:column;gap:4px;}
+.field label{font-size:12px;color:var(--ink-soft);font-weight:600;}
+select,.txt,input[type=text],input[type=number],input[type=date]{
+  border:1px solid var(--line);border-radius:9px;padding:9px 12px;font-size:14px;
+  background:#fff;color:var(--ink);min-height:40px;
+}
+select:focus,.txt:focus,input:focus,textarea:focus{outline:2px solid var(--navy-light);outline-offset:1px;}
+
+.btn{
+  border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;
+  border:1px solid transparent;display:inline-flex;align-items:center;gap:6px;
+  min-height:42px;
+}
+.btn-primary{background:var(--navy);color:#fff;}
+.btn-primary:hover{background:var(--navy-light);}
+.btn-gold{background:var(--gold);color:var(--navy-dark);}
+.btn-gold:hover{background:#d8b876;}
+.btn-outline{background:#fff;border-color:var(--line);color:var(--ink);}
+.btn-outline:hover{background:var(--cream);}
+.btn-danger{background:#fff;border-color:var(--red);color:var(--red);}
+.btn-danger:hover{background:var(--red-light);}
+.btn-sm{padding:6px 10px;font-size:12px;min-height:32px;border-radius:8px;}
+.btn:disabled{opacity:.45;cursor:not-allowed;}
+
+.chip{
+  display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:100px;
+  font-size:12.5px;font-weight:600;border:1px solid var(--line);background:#fff;color:var(--ink-soft);
+}
+.chip.gold{background:var(--gold-light);color:#7A5C1E;border-color:transparent;}
+.chip.red{background:var(--red-light);color:var(--red);border-color:transparent;}
+.chip.green{background:var(--green-light);color:var(--green);border-color:transparent;}
+
+.badge-dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+
+/* stat cards on dashboard */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px;}
+.stat-card{
+  background:#fff;border:1px solid var(--line);border-radius:var(--radius);
+  padding:16px;box-shadow:var(--shadow);position:relative;overflow:hidden;
+}
+.stat-card::before{
+  content:"";position:absolute;top:-20px;right:-20px;width:70px;height:70px;border-radius:50%;
+  background:var(--cream);
+}
+.stat-card .num{font-family:'Kanit';font-size:28px;font-weight:700;color:var(--navy-dark);position:relative;}
+.stat-card .lbl{font-size:12.5px;color:var(--ink-soft);margin-top:2px;position:relative;}
+
+/* tables */
+.tbl-wrap{overflow-x:auto;border-radius:12px;border:1px solid var(--line);}
+table{border-collapse:collapse;width:100%;font-size:13.5px;background:#fff;}
+th,td{padding:9px 11px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap;}
+th{background:var(--navy);color:#fff;font-weight:600;font-family:'Kanit';font-size:12.5px;position:sticky;top:0;}
+td.name-cell,th.name-cell{text-align:right;position:sticky;left:0;background:#fff;z-index:2;box-shadow:1px 0 0 var(--line);}
+th.name-cell{background:var(--navy);z-index:3;}
+tr:nth-child(even) td{background:#FBFAF6;}
+tr:nth-child(even) td.name-cell{background:#FBFAF6;}
+tr:hover td{background:#F2EEE0;}
+tr:hover td.name-cell{background:#F2EEE0;}
+td input[type=number]{width:64px;min-height:34px;padding:4px 6px;text-align:center;}
+
+.score-input.warn{border-color:var(--red);background:var(--red-light);}
+
+/* Attendance grid (mobile-first cards) */
+.att-list{display:flex;flex-direction:column;gap:8px;}
+.att-row{
+  display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--line);
+  border-radius:12px;padding:10px 12px;
+}
+.att-row .idx{width:26px;color:var(--ink-soft);font-size:12px;flex-shrink:0;}
+.att-row .who{flex:1;min-width:0;}
+.att-row .who .nm{font-weight:600;font-size:14.5px;}
+.att-row .who .pct{font-size:11.5px;color:var(--ink-soft);}
+.att-row .who .pct.warn{color:var(--red);font-weight:700;}
+.status-btns{display:flex;gap:4px;flex-wrap:wrap;}
+.st-btn{
+  border:1.5px solid var(--line);background:#fff;border-radius:9px;padding:7px 9px;
+  font-size:12px;font-weight:700;min-width:38px;min-height:38px;color:var(--ink-soft);
+}
+.st-btn.on-present{background:var(--green);border-color:var(--green);color:#fff;}
+.st-btn.on-absent{background:var(--red);border-color:var(--red);color:#fff;}
+.st-btn.on-sick{background:var(--amber);border-color:var(--amber);color:#fff;}
+.st-btn.on-personal{background:#7A5C1E;border-color:#7A5C1E;color:#fff;}
+.st-btn.on-late{background:var(--navy-light);border-color:var(--navy-light);color:#fff;}
+.st-btn.on-other{background:#6B7280;border-color:#6B7280;color:#fff;}
+.note-input{width:100%;margin-top:8px;}
+
+/* Behavior */
+.beh-row{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:8px;}
+.beh-top{display:flex;align-items:center;gap:10px;}
+.beh-top .nm{flex:1;font-weight:600;}
+.beh-score{font-family:'Kanit';font-weight:700;font-size:18px;min-width:44px;text-align:center;padding:4px 8px;border-radius:8px;}
+.beh-score.pos{color:var(--green);background:var(--green-light);}
+.beh-score.neg{color:var(--red);background:var(--red-light);}
+.beh-score.zero{color:var(--ink-soft);background:var(--cream);}
+.reason-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}
+.reason-chip{
+  border:1px solid var(--line);background:var(--cream);border-radius:100px;padding:6px 12px;
+  font-size:12px;font-weight:600;color:var(--ink-soft);
+}
+.reason-chip.plus{color:var(--green);}
+.reason-chip.minus{color:var(--red);}
+.beh-log{margin-top:8px;font-size:11.5px;color:var(--ink-soft);}
+.beh-log .entry{display:flex;justify-content:space-between;padding:3px 0;border-top:1px dashed var(--line);}
+
+/* grade badges */
+.grade-pill{font-family:'Kanit';font-weight:700;padding:3px 10px;border-radius:100px;font-size:13px;display:inline-block;}
+.g4{background:var(--green-light);color:var(--green);}
+.g3{background:#DCEAF3;color:#215E85;}
+.g2{background:var(--amber-light);color:var(--amber);}
+.g1{background:#F3E4CC;color:#9C5B1F;}
+.g0{background:var(--red-light);color:var(--red);}
+
+.empty-state{
+  text-align:center;padding:50px 20px;color:var(--ink-soft);
+}
+.empty-state .ic{font-size:42px;margin-bottom:10px;}
+
+.modal-backdrop{
+  position:fixed;inset:0;background:rgba(18,39,71,.45);z-index:100;
+  display:flex;align-items:center;justify-content:center;padding:16px;
+}
+.modal{
+  background:#fff;border-radius:16px;padding:22px;max-width:420px;width:100%;
+  box-shadow:0 20px 60px rgba(0,0,0,.25);max-height:88vh;overflow-y:auto;
+}
+.modal h3{margin-top:0;}
+.modal-close{position:absolute;}
+
+.toast{
+  position:fixed;bottom:90px;left:50%;transform:translateX(-50%);
+  background:var(--navy-dark);color:#fff;padding:10px 18px;border-radius:100px;
+  font-size:13px;font-weight:600;z-index:200;box-shadow:var(--shadow);
+  animation:fadein .2s ease;
+}
+@media (max-width:860px){.toast{bottom:78px;}}
+@keyframes fadein{from{opacity:0;transform:translate(-50%,8px);}to{opacity:1;transform:translate(-50%,0);}}
+
+.subject-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
+.subject-tab{
+  border:1px solid var(--line);background:#fff;border-radius:100px;padding:8px 16px;
+  font-size:13.5px;font-weight:600;color:var(--ink-soft);
+}
+.subject-tab.active{background:var(--gold);color:var(--navy-dark);border-color:var(--gold);}
+
+.class-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;}
+.class-tab{
+  border:1px solid var(--line);background:#fff;border-radius:9px;padding:8px 14px;
+  font-size:13px;font-weight:700;color:var(--navy-dark);
+}
+.class-tab.active{background:var(--navy);color:#fff;border-color:var(--navy);}
+
+.link-btn{background:none;border:none;color:var(--navy);font-weight:600;font-size:13px;text-decoration:underline;padding:4px 0;}
+
+.roster-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);}
+.roster-row:last-child{border-bottom:none;}
+.roster-row .no{width:26px;color:var(--ink-soft);font-size:12px;}
+
+.progress-bar{height:8px;border-radius:100px;background:var(--cream);overflow:hidden;}
+.progress-bar .fill{height:100%;border-radius:100px;}
+
+.hint{font-size:12px;color:var(--ink-soft);}
+.section-divider{height:1px;background:var(--line);margin:16px 0;}
+
+.weight-inputs{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+@media(max-width:560px){.weight-inputs{grid-template-columns:1fr;}}
+
+::-webkit-scrollbar{height:8px;width:8px;}
+::-webkit-scrollbar-thumb{background:var(--line);border-radius:100px;}
+
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+window.LOGO_B64 = "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";
+window.STUDENTS_DEFAULT = {"ป.4/3": [{"no": 1, "id": "10987", "title": "ด.ช.", "first": "ธีรโชติ์", "last": "แก้วเจริญสุข"}, {"no": 2, "id": "11110", "title": "ด.ช.", "first": "ภากร", "last": "เพ็งศิลป์"}, {"no": 3, "id": "11116", "title": "ด.ช.", "first": "ปิยชนน์", "last": "อินทสมบัตร์"}, {"no": 4, "id": "11120", "title": "ด.ช.", "first": "ยสินทร", "last": "มหัทธนะประดิษฐ"}, {"no": 5, "id": "11127", "title": "ด.ญ.", "first": "พรพรรณ", "last": "เพียรวิบูลย์กิจ"}, {"no": 6, "id": "11132", "title": "ด.ญ.", "first": "ศกุลตรัตน์", "last": "เกตุรวม"}, {"no": 7, "id": "11150", "title": "ด.ญ.", "first": "ชิดชนก", "last": "แพพวงทิพย์"}, {"no": 8, "id": "11167", "title": "ด.ญ.", "first": "เบญญาภา", "last": "กอวิเศษสุทธิ์"}, {"no": 9, "id": "11187", "title": "ด.ช.", "first": "รัชชานนท์", "last": "อังกุโร"}, {"no": 10, "id": "11189", "title": "ด.ช.", "first": "พีรพัฒน์", "last": "แต่งผิว"}, {"no": 11, "id": "11190", "title": "ด.ช.", "first": "สัมฤทธิ์", "last": "แซ่กอ"}, {"no": 12, "id": "11191", "title": "ด.ญ.", "first": "พรนัชชา", "last": "แต่งศิริลักษณ์"}, {"no": 13, "id": "11211", "title": "ด.ช.", "first": "กวีรัธน์", "last": "แผ้วสกุลพันธ์"}, {"no": 14, "id": "11234", "title": "ด.ญ.", "first": "ธัญชนก", "last": "ศิริบูชา"}, {"no": 15, "id": "11235", "title": "ด.ช.", "first": "ธนกฤต", "last": "จิรโชติเดชากุล"}, {"no": 16, "id": "11241", "title": "ด.ช.", "first": "ไกรวิชญ์", "last": "ฮะบุญมี"}, {"no": 17, "id": "11244", "title": "ด.ช.", "first": "ภาวินท์", "last": "ศรีสมบุญ"}, {"no": 18, "id": "11257", "title": "ด.ญ.", "first": "เบญญาภา", "last": "อมรแมนนันท์"}, {"no": 19, "id": "11262", "title": "ด.ช.", "first": "สัณหณัฐ", "last": "กรณีสุข"}, {"no": 20, "id": "11320", "title": "ด.ญ.", "first": "กัญญาพัชร", "last": "ปราบปัญจะ"}, {"no": 21, "id": "11328", "title": "ด.ช.", "first": "ธาม", "last": "กีรติปาล"}, {"no": 22, "id": "11338", "title": "ด.ญ.", "first": "ณัฏฐ์ณิชา", "last": "จันทร์งาม"}, {"no": 23, "id": "11412", "title": "ด.ช.", "first": "ฐิติพัสส์", "last": "สุขต้น"}, {"no": 24, "id": "11616", "title": "ด.ช.", "first": "ธนันชัย", "last": "ศรทรง"}, {"no": 25, "id": "11837", "title": "ด.ญ.", "first": "ลลนา", "last": "โพธิ์มี"}], "ป.6/1": [{"no": 1, "id": "10650", "title": "ด.ญ.", "first": "ปาณิสรา", "last": "ปังศรี"}, {"no": 2, "id": "10765", "title": "ด.ช.", "first": "ธนาสิทธิ์", "last": "สีลานุโลม"}, {"no": 3, "id": "10767", "title": "ด.ช.", "first": "สรวิชญ์", "last": "เต๊ยฉิน"}, {"no": 4, "id": "10768", "title": "ด.ช.", "first": "กนก", "last": "ช่วนเส็ง"}, {"no": 5, "id": "10771", "title": "ด.ช.", "first": "กฤษตพัฒน์", "last": "นุชชาติ"}, {"no": 6, "id": "10773", "title": "ด.ช.", "first": "ณภัทร", "last": "ศิริพิทักษ์ชัย"}, {"no": 7, "id": "10781", "title": "ด.ญ.", "first": "ปพิชญา", "last": "แก้วนาคา"}, {"no": 8, "id": "10785", "title": "ด.ญ.", "first": "ชญานิน", "last": "ณ ลำปาง"}, {"no": 9, "id": "10805", "title": "ด.ญ.", "first": "ภัทรวดี", "last": "โกประเสริฐกูล"}, {"no": 10, "id": "10806", "title": "ด.ญ.", "first": "ปุณยาพร", "last": "ตันสมบุญ"}, {"no": 11, "id": "10816", "title": "ด.ช.", "first": "วสุ", "last": "ภัทรเกษวิทย์"}, {"no": 12, "id": "10818", "title": "ด.ช.", "first": "พงษ์พิชญ์", "last": "ถิระศุภศรี"}, {"no": 13, "id": "10821", "title": "ด.ช.", "first": "ศุภกรณ์", "last": "กระเหิมหาญ"}, {"no": 14, "id": "10822", "title": "ด.ช.", "first": "พชรพล", "last": "จันทอง"}, {"no": 15, "id": "10823", "title": "ด.ช.", "first": "กฤตลักษณ์", "last": "แสงสว่าง"}, {"no": 16, "id": "10824", "title": "ด.ช.", "first": "ภูมินันท์", "last": "เจียรศักดิ์โสภณ"}, {"no": 17, "id": "10825", "title": "ด.ช.", "first": "ณัฐกรณ์", "last": "พ่วงพิศ"}, {"no": 18, "id": "10828", "title": "ด.ญ.", "first": "ณัฐนิช", "last": "ศรสำราญ"}, {"no": 19, "id": "10832", "title": "ด.ญ.", "first": "รัสกร", "last": "เอกธรรมยุทธ์"}, {"no": 20, "id": "10833", "title": "ด.ญ.", "first": "ณัฐณิชา", "last": "วงษ์ไร"}, {"no": 21, "id": "10837", "title": "ด.ญ.", "first": "ฉันท์นภา", "last": "เอกธรรมยุทธ์"}, {"no": 22, "id": "10839", "title": "ด.ช.", "first": "ภคนนท์", "last": "บุญบางยาง"}, {"no": 23, "id": "10841", "title": "ด.ช.", "first": "จิระเดช", "last": "จีนโก๊ว"}, {"no": 24, "id": "10844", "title": "ด.ช.", "first": "กนกพล", "last": "ทรงมณี"}, {"no": 25, "id": "10845", "title": "ด.ช.", "first": "ปุญณพัฒน์", "last": "อินจงกล"}, {"no": 26, "id": "10847", "title": "ด.ญ.", "first": "ญาดา", "last": "สิทธิ์ชาวกรุง"}, {"no": 27, "id": "10848", "title": "ด.ญ.", "first": "พรลภัส", "last": "แต่งผิว"}, {"no": 28, "id": "10879", "title": "ด.ช.", "first": "วุฒิภัทร", "last": "พงษ์เภา"}, {"no": 29, "id": "10892", "title": "ด.ญ.", "first": "กัญญาวีร์", "last": "วิลาศรี"}, {"no": 30, "id": "11051", "title": "ด.ญ.", "first": "ดลณดา", "last": "แขกดำ"}, {"no": 31, "id": "11154", "title": "ด.ช.", "first": "นราวิชญ์", "last": "แดงสุนทรชัย"}, {"no": 32, "id": "11880", "title": "ด.ช.", "first": "จิตติพงศ์", "last": "กอสนธิ"}], "ป.6/2": [{"no": 1, "id": "10769", "title": "ด.ช.", "first": "ภัคธีมา", "last": "เอกพงษ์"}, {"no": 2, "id": "10775", "title": "ด.ช.", "first": "พัชรพงษ์", "last": "คิดประเสริฐ"}, {"no": 3, "id": "10780", "title": "ด.ช.", "first": "ชินบุตร", "last": "ขันตยาภรณ์"}, {"no": 4, "id": "10784", "title": "ด.ญ.", "first": "ประติชญา", "last": "เทศทอง"}, {"no": 5, "id": "10787", "title": "ด.ญ.", "first": "ณิชา", "last": "จิรนิรัติศัย"}, {"no": 6, "id": "10812", "title": "ด.ญ.", "first": "ธนัญญา", "last": "มหัทธนะประดิษฐ"}, {"no": 7, "id": "10819", "title": "ด.ช.", "first": "สิทธินนท์", "last": "พายภัก"}, {"no": 8, "id": "10827", "title": "ด.ญ.", "first": "วนิดา", "last": "ง้าวแก้ว"}, {"no": 9, "id": "10829", "title": "ด.ญ.", "first": "ภัทธนิดา", "last": "อร่ามสิริพรไพศาล"}, {"no": 10, "id": "10830", "title": "ด.ญ.", "first": "ณัฐชญา", "last": "อุดมโภชน์"}, {"no": 11, "id": "10831", "title": "ด.ญ.", "first": "นวพร", "last": "ลิ้มสุทธิคุณ"}, {"no": 12, "id": "10834", "title": "ด.ญ.", "first": "พร้อมรัก", "last": "มณีประเสริฐ"}, {"no": 13, "id": "10835", "title": "ด.ญ.", "first": "ณัฏฐณิชา", "last": "บุญชู"}, {"no": 14, "id": "10838", "title": "ด.ช.", "first": "ปัณณพัฒน์", "last": "เจียมจรรยา"}, {"no": 15, "id": "10842", "title": "ด.ช.", "first": "กฤติเดช", "last": "สัมฤทธิ์ผล"}, {"no": 16, "id": "10843", "title": "ด.ช.", "first": "จิรัฎฐ์", "last": "อยู่พิพัฒน์"}, {"no": 17, "id": "10846", "title": "ด.ญ.", "first": "ณัฐณิชา", "last": "ใจงาม"}, {"no": 18, "id": "10850", "title": "ด.ญ.", "first": "จารุเชษฐ์", "last": "ปัทมะสัมพันธ์"}, {"no": 19, "id": "10851", "title": "ด.ญ.", "first": "ณัฎณิชา", "last": "อุ่นเจริญ"}, {"no": 20, "id": "10853", "title": "ด.ช.", "first": "ณฐนนท์", "last": "กรคณฑี"}, {"no": 21, "id": "10854", "title": "ด.ช.", "first": "จิรวัฒน์", "last": "อุดมโภชน์"}, {"no": 22, "id": "10887", "title": "ด.ช.", "first": "รัชชานนท์", "last": "ลือภักดีสกุล"}, {"no": 23, "id": "11052", "title": "ด.ญ.", "first": "ขวัญทิพย์", "last": "เกิดสรรทัศน์"}, {"no": 24, "id": "11147", "title": "ด.ช.", "first": "ธนทร", "last": "โสภณกนกรัฐกูล"}, {"no": 25, "id": "11276", "title": "ด.ช.", "first": "ภัทรพล", "last": "นภาสนธิ์"}, {"no": 26, "id": "11335", "title": "ด.ช.", "first": "ปวรุตม์", "last": "รักษาราช"}, {"no": 27, "id": "11357", "title": "ด.ช.", "first": "ฐิติพันธ์", "last": "พัชรสุนทรภักดี"}, {"no": 28, "id": "11488", "title": "ด.ญ.", "first": "พิมพ์พัฒน์", "last": "เต็งใช่สุน"}, {"no": 29, "id": "11843", "title": "ด.ช.", "first": "ปณชัย", "last": "ประสิทธิ์แสงอารีย์"}, {"no": 30, "id": "11997", "title": "ด.ช.", "first": "กฤษกร", "last": "วรนิติเยาวภา"}], "ป.6/3": [{"no": 1, "id": "10776", "title": "ด.ช.", "first": "กิตติเดช", "last": "จันทร์ปุก"}, {"no": 2, "id": "10782", "title": "ด.ช.", "first": "ไชยพศ", "last": "ชื่นสุวรรณ"}, {"no": 3, "id": "10786", "title": "ด.ญ.", "first": "ปรีชญา", "last": "อินจงกล"}, {"no": 4, "id": "10788", "title": "ด.ญ.", "first": "เยาวเรศ", "last": "จันทนะโสตถิ์"}, {"no": 5, "id": "10789", "title": "ด.ญ.", "first": "ธีรตา", "last": "ศรีรุ่งเรือง"}, {"no": 6, "id": "10790", "title": "ด.ญ.", "first": "นันทวัน", "last": "อิ่มเกษม"}, {"no": 7, "id": "10810", "title": "ด.ญ.", "first": "ฐาปนีย์", "last": "ปรึกษากร"}, {"no": 8, "id": "10858", "title": "ด.ช.", "first": "กิตติชัย", "last": "กิตติพงศธรชัย"}, {"no": 9, "id": "10862", "title": "ด.ช.", "first": "นริศ", "last": "เอื้อพงษ์พันธุ์"}, {"no": 10, "id": "10863", "title": "ด.ช.", "first": "ธนบดี", "last": "แสงอรุณ"}, {"no": 11, "id": "10867", "title": "ด.ญ.", "first": "คุณัญญา", "last": "วิวัฒน์รุ่งเรืองดี"}, {"no": 12, "id": "10868", "title": "ด.ญ.", "first": "ชณิการ์", "last": "รอดธานี"}, {"no": 13, "id": "10869", "title": "ด.ญ.", "first": "ณดา", "last": "พิมพาหุ"}, {"no": 14, "id": "10870", "title": "ด.ญ.", "first": "ชนิกานต์", "last": "ขวัญสุวรรณ"}, {"no": 15, "id": "10872", "title": "ด.ญ.", "first": "ณัฐนพิน", "last": "แต้ภักดี"}, {"no": 16, "id": "10875", "title": "ด.ญ.", "first": "ศิริพร", "last": "จันทร์ทอง"}, {"no": 17, "id": "10877", "title": "ด.ช.", "first": "ธนวัตน์", "last": "อัครยากุลนันทร์"}, {"no": 18, "id": "10880", "title": "ด.ช.", "first": "กฤติพงศ์", "last": "กอประเสริฐสุด"}, {"no": 19, "id": "10881", "title": "ด.ช.", "first": "ธนกร", "last": "วิไลพันธุ์รัตนา"}, {"no": 20, "id": "10882", "title": "ด.ช.", "first": "วรพงศ์", "last": "หงส์ศุภางค์พันธ์"}, {"no": 21, "id": "10885", "title": "ด.ช.", "first": "ธนภัทร", "last": "มวนออม"}, {"no": 22, "id": "10888", "title": "ด.ช.", "first": "เตชิต", "last": "เกษตรตระการ"}, {"no": 23, "id": "10890", "title": "ด.ช.", "first": "ทินณ์ชนก", "last": "กลั่นภักดี"}, {"no": 24, "id": "10891", "title": "ด.ญ.", "first": "ภคพร", "last": "กอเจริญ"}, {"no": 25, "id": "10893", "title": "ด.ญ.", "first": "นรินทร", "last": "ชิ้นไพบูลย์"}, {"no": 26, "id": "10894", "title": "ด.ญ.", "first": "ภัทราพร", "last": "แซ่เตีย"}, {"no": 27, "id": "10896", "title": "ด.ญ.", "first": "นภัค", "last": "อุ้ยทรัพย์"}, {"no": 28, "id": "10898", "title": "ด.ญ.", "first": "สิริภัสสร", "last": "เย็นปู"}, {"no": 29, "id": "10899", "title": "ด.ญ.", "first": "ณัชชา", "last": "พูลบัว"}, {"no": 30, "id": "10913", "title": "ด.ญ.", "first": "ธนัชพร", "last": "อึ๊งมงคลชัย"}, {"no": 31, "id": "10984", "title": "ด.ช.", "first": "เตวิช", "last": "ประทุมศรีขจร"}, {"no": 32, "id": "11055", "title": "ด.ญ.", "first": "ชลิตา", "last": "แซ่กอ"}, {"no": 33, "id": "11100", "title": "ด.ญ.", "first": "ศศิวิมล", "last": "แซ่โกว"}, {"no": 34, "id": "11171", "title": "ด.ญ.", "first": "เบญญาภา", "last": "ฤทธิเดช"}, {"no": 35, "id": "11404", "title": "ด.ช.", "first": "ณัฐนนท์", "last": "คล้อยเขียว"}, {"no": 36, "id": "11454", "title": "ด.ญ.", "first": "ธัญรดา", "last": "อ่างสุวรรณ"}, {"no": 37, "id": "11489", "title": "ด.ญ.", "first": "ศิริรัตน์", "last": "จันทร์เป้า"}, {"no": 38, "id": "11844", "title": "ด.ญ.", "first": "เกสรา", "last": "รางทัน"}, {"no": 39, "id": "12155", "title": "ด.ญ.", "first": "ธัญญาภรณ์", "last": "ยิ้มแย้ม"}, {"no": 40, "id": "12156", "title": "ด.ญ.", "first": "ณัฐรินีย์", "last": "เพ็ชรเที่ยง"}], "ป.6/4": [{"no": 1, "id": "10764", "title": "ด.ช.", "first": "วันชัย", "last": "เอี้ยวสุวรรณ"}, {"no": 2, "id": "10778", "title": "ด.ช.", "first": "ศรัณย์ภัทร", "last": "ทับทิมแสน"}, {"no": 3, "id": "10799", "title": "ด.ช.", "first": "กรภัทร", "last": "นุชพิทักษ์"}, {"no": 4, "id": "10807", "title": "ด.ช.", "first": "กฤตานนท์", "last": "พริ้งดี"}, {"no": 5, "id": "10855", "title": "ด.ช.", "first": "กฤติน", "last": "ตันวัฒนาดำเนิน"}, {"no": 6, "id": "10857", "title": "ด.ช.", "first": "ทองโตไทย", "last": "กันสุทิธ์ทิพโสต"}, {"no": 7, "id": "10859", "title": "ด.ช.", "first": "จัสติน", "last": "วลีฤดีกุล"}, {"no": 8, "id": "10860", "title": "ด.ช.", "first": "พีรยุทธ", "last": "ปิ่นแก้ว"}, {"no": 9, "id": "10861", "title": "ด.ช.", "first": "ฐาปนพงศ์", "last": "ทองเสมา"}, {"no": 10, "id": "10865", "title": "ด.ช.", "first": "กฤตเมธ", "last": "ประสาทสิทธิ์"}, {"no": 11, "id": "10866", "title": "ด.ช.", "first": "ฐาปนพงษ์", "last": "พวงประเสริฐศีล"}, {"no": 12, "id": "10871", "title": "ด.ญ.", "first": "กัญญาภัทร", "last": "คูประสิทธิ์"}, {"no": 13, "id": "10876", "title": "ด.ช.", "first": "พุฒิภัทร", "last": "สุขศรี"}, {"no": 14, "id": "10883", "title": "ด.ช.", "first": "พีรพัฒน์", "last": "อุดมโภชน์"}, {"no": 15, "id": "10884", "title": "ด.ช.", "first": "ปุญญพัฒน์", "last": "ประยุทธ์พร"}, {"no": 16, "id": "10886", "title": "ด.ช.", "first": "ธนกฤต", "last": "ดนัยวรานนท์"}, {"no": 17, "id": "10889", "title": "ด.ช.", "first": "ณัฐพงษ์", "last": "ประทุมศรีขจร"}, {"no": 18, "id": "10895", "title": "ด.ญ.", "first": "มีนรดา", "last": "ลลิตวงศากุล"}, {"no": 19, "id": "10900", "title": "ด.ญ.", "first": "ธัญพิชชา", "last": "ม่วงอ่ำ"}, {"no": 20, "id": "10943", "title": "ด.ช.", "first": "ชิษณุพงษ์", "last": "สุขขี"}, {"no": 21, "id": "10944", "title": "ด.ช.", "first": "ณัฐพล", "last": "เลิศผสมสิทธิ์"}, {"no": 22, "id": "11044", "title": "ด.ช.", "first": "ชัยวรพงศ์", "last": "ทับจันทร์"}, {"no": 23, "id": "11054", "title": "ด.ช.", "first": "สุวัฒณกิจ", "last": "สงสุวรรณ"}, {"no": 24, "id": "11056", "title": "ด.ญ.", "first": "โชติกา", "last": "โพธิ์เทศ"}, {"no": 25, "id": "11058", "title": "ด.ช.", "first": "เฉลิมพร", "last": "เจริญสกุล"}, {"no": 26, "id": "11065", "title": "ด.ญ.", "first": "ปภัสตรา", "last": "เมฆสมศรี"}, {"no": 27, "id": "11101", "title": "ด.ช.", "first": "สงกรานต์", "last": "คงปั้น"}, {"no": 28, "id": "11274", "title": "ด.ญ.", "first": "ณัฐชา", "last": "จีระมะกร"}, {"no": 29, "id": "11275", "title": "ด.ช.", "first": "โกมินทร์", "last": "น้ำทอง"}, {"no": 30, "id": "11281", "title": "ด.ช.", "first": "พงศกร", "last": "ไพนรินทร์"}, {"no": 31, "id": "11347", "title": "ด.ช.", "first": "วรพงษ์", "last": "ปิ่นประดับ"}, {"no": 32, "id": "11352", "title": "ด.ญ.", "first": "กฤติมา", "last": "วิเศษศิริ"}, {"no": 33, "id": "11459", "title": "ด.ญ.", "first": "กิตติญา", "last": "แสงฉาย"}, {"no": 34, "id": "11468", "title": "ด.ญ.", "first": "ปวันรัตน์", "last": "เหลืองประดับใจ"}, {"no": 35, "id": "11697", "title": "ด.ช.", "first": "ณัฐพร", "last": "อินทสันต์"}, {"no": 36, "id": "11998", "title": "ด.ญ.", "first": "กวิตา", "last": "จันทร์สมุทร"}]};
+</script>
+<script>
+/* ================= Utilities ================= */
+function uid(){ return 'x'+Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function todayStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function fmtDateTH(iso){
+  if(!iso) return '';
+  const [y,m,d]=iso.split('-').map(Number);
+  const months=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  return `${d} ${months[m-1]} ${y+543}`;
+}
+function fullName(s){ return `${s.title}${s.first} ${s.last}`; }
+function clamp(n,min,max){ return Math.max(min,Math.min(max,n)); }
+function round1(n){ return Math.round(n*10)/10; }
+
+const GRADE_TABLE = [
+  {min:80,grade:4,label:'ดีเยี่ยม',css:'g4'},
+  {min:75,grade:3.5,label:'ดีมาก',css:'g4'},
+  {min:70,grade:3,label:'ดี',css:'g3'},
+  {min:65,grade:2.5,label:'ค่อนข้างดี',css:'g3'},
+  {min:60,grade:2,label:'ปานกลาง',css:'g2'},
+  {min:55,grade:1.5,label:'พอใช้',css:'g1'},
+  {min:50,grade:1,label:'ผ่านเกณฑ์ขั้นต่ำ',css:'g1'},
+  {min:0,grade:0,label:'ต่ำกว่าเกณฑ์ขั้นต่ำ',css:'g0'},
+];
+function gradeFor(pct){
+  for(const g of GRADE_TABLE){ if(pct>=g.min) return g; }
+  return GRADE_TABLE[GRADE_TABLE.length-1];
+}
+
+const STATUS_DEFS = [
+  {key:'present',label:'มา',short:'มา',cls:'on-present'},
+  {key:'absent',label:'ขาด',short:'ขาด',cls:'on-absent'},
+  {key:'sick',label:'ลาป่วย',short:'ป่วย',cls:'on-sick'},
+  {key:'personal',label:'ลากิจ',short:'ลากิจ',cls:'on-personal'},
+  {key:'late',label:'มาสาย',short:'สาย',cls:'on-late'},
+  {key:'other',label:'อื่นๆ',short:'อื่นๆ',cls:'on-other'},
+];
+function statusDef(key){ return STATUS_DEFS.find(s=>s.key===key); }
+
+const BEHAVIOR_REASONS = [
+  {label:'ส่งงานตรงเวลา', delta:2},
+  {label:'ความสะอาดเรียบร้อย', delta:1},
+  {label:'มีส่วนร่วมในห้องเรียน', delta:2},
+  {label:'ช่วยเหลือเพื่อน', delta:2},
+  {label:'มารยาทดี', delta:1},
+  {label:'ไม่ส่งงาน', delta:-2},
+  {label:'มาสาย/ไม่ตรงเวลา', delta:-1},
+  {label:'ไม่มีวินัยในห้องเรียน', delta:-2},
+  {label:'พูดจาไม่สุภาพ', delta:-2},
+];
+
+/* ================= State ================= */
+let STATE = null;
+let SAVE_TIMER = null;
+let CUR_TAB = 'dashboard';
+let UI = { // transient UI selections, not persisted
+  attClass: null, attDate: todayStr(),
+  scoreSubject: null, scoreClass: null,
+  gradeSubject: null, gradeClass: null,
+  behClass: null,
+  dashClass: null,
+};
+
+function defaultState(){
+  const roster = JSON.parse(JSON.stringify(window.STUDENTS_DEFAULT || {}));
+  return {
+    version: 1,
+    roster,
+    classNames: Object.keys(roster),
+    subjects: [],
+    assignments: {},
+    scores: {},
+    attendance: {},
+    gradeConfig: {},
+    behavior: {},
+  };
+}
+
+async function loadState(){
+  try{
+    const res = await window.storage.get('app-data', false);
+    if(res && res.value){
+      const parsed = JSON.parse(res.value);
+      // merge in any new default classes/students without clobbering edits
+      const def = defaultState();
+      parsed.roster = parsed.roster || def.roster;
+      parsed.classNames = parsed.classNames || def.classNames;
+      parsed.subjects = parsed.subjects || [];
+      parsed.assignments = parsed.assignments || {};
+      parsed.scores = parsed.scores || {};
+      parsed.attendance = parsed.attendance || {};
+      parsed.gradeConfig = parsed.gradeConfig || {};
+      parsed.behavior = parsed.behavior || {};
+      STATE = parsed;
+    } else {
+      STATE = defaultState();
+    }
+  }catch(e){
+    STATE = defaultState();
+  }
+}
+
+function saveState(){
+  clearTimeout(SAVE_TIMER);
+  SAVE_TIMER = setTimeout(async ()=>{
+    try{ await window.storage.set('app-data', JSON.stringify(STATE), false); }
+    catch(e){ console.error('save failed', e); showToast('บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง'); }
+  }, 250);
+}
+
+/* ================= Toast ================= */
+function showToast(msg){
+  const old = document.querySelector('.toast');
+  if(old) old.remove();
+  const t = document.createElement('div');
+  t.className='toast'; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(), 2200);
+}
+
+/* ================= Nav / Shell ================= */
+const NAV = [
+  {key:'dashboard', label:'ภาพรวม', ic:'🏠'},
+  {key:'attendance', label:'เช็คชื่อ', ic:'✅'},
+  {key:'scores', label:'เก็บคะแนน', ic:'📝'},
+  {key:'grades', label:'ตัดเกรด', ic:'📊'},
+  {key:'behavior', label:'พฤติกรรม', ic:'⭐'},
+];
+
+function renderShell(){
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="topbar">
+      <img src="data:image/jpeg;base64,${window.LOGO_B64}" alt="โลโก้โรงเรียน">
+      <div class="titles">
+        <div class="school">โรงเรียนวันทามาเรีย ราชบุรี</div>
+        <div class="sub">ระบบผู้ช่วยคุณครูประจำชั้น</div>
+      </div>
+    </div>
+    <div class="shell">
+      <div class="sidenav">
+        ${NAV.map(n=>`<button class="navitem ${n.key===CUR_TAB?'active':''}" onclick="goTab('${n.key}')"><span class="ic">${n.ic}</span>${n.label}</button>`).join('')}
+      </div>
+      <div class="main" id="main"></div>
+    </div>
+    <div class="bottomnav"><div class="bottomnav-inner">
+      ${NAV.map(n=>`<button class="navitem ${n.key===CUR_TAB?'active':''}" onclick="goTab('${n.key}')"><span class="ic">${n.ic}</span>${n.label}</button>`).join('')}
+    </div></div>
+  `;
+  renderMain();
+}
+
+function goTab(key){ CUR_TAB = key; renderShell(); window.scrollTo(0,0); }
+
+function renderMain(){
+  const main = document.getElementById('main');
+  if(CUR_TAB==='dashboard') main.innerHTML = pageDashboard();
+  else if(CUR_TAB==='attendance') main.innerHTML = pageAttendance();
+  else if(CUR_TAB==='scores') main.innerHTML = pageScores();
+  else if(CUR_TAB==='grades') main.innerHTML = pageGrades();
+  else if(CUR_TAB==='behavior') main.innerHTML = pageBehavior();
+  afterRenderHooks();
+}
+function afterRenderHooks(){
+  // nothing global for now; per-page hooks called inline where needed
+}
+function refresh(){ renderMain(); }
+
+/* ================= Attendance stats helper ================= */
+function attendanceStatsForClass(className){
+  const cls = STATE.attendance[className] || {};
+  const dates = Object.keys(cls);
+  const stats = {}; // studentId -> {total, absent, sick, personal, late, other, present}
+  (STATE.roster[className]||[]).forEach(s=>{ stats[s.id] = {total:0,present:0,absent:0,sick:0,personal:0,late:0,other:0}; });
+  dates.forEach(d=>{
+    const day = cls[d];
+    Object.keys(day).forEach(sid=>{
+      if(!stats[sid]) return;
+      stats[sid].total++;
+      const st = day[sid].status;
+      if(stats[sid][st]!==undefined) stats[sid][st]++;
+    });
+  });
+  return stats;
+}
+
+/* =================================================================
+   PAGE: DASHBOARD
+   ================================================================= */
+function pageDashboard(){
+  if(!UI.dashClass) UI.dashClass = STATE.classNames[0];
+  const totalStudents = STATE.classNames.reduce((a,c)=>a+(STATE.roster[c]||[]).length,0);
+  const totalSubjects = STATE.subjects.length;
+  const totalClasses = STATE.classNames.length;
+  let attendanceDaysLogged = 0;
+  STATE.classNames.forEach(c=>{ attendanceDaysLogged += Object.keys(STATE.attendance[c]||{}).length; });
+
+  const cls = UI.dashClass;
+  const roster = STATE.roster[cls]||[];
+  const stats = attendanceStatsForClass(cls);
+
+  return `
+  <div class="page-head">
+    <div><h1>ภาพรวม & จัดการข้อมูล</h1><div class="desc">จัดการรายชื่อนักเรียนและรายวิชา — หน้าแรกหลังเข้าสู่ระบบ</div></div>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card"><div class="num">${totalClasses}</div><div class="lbl">ห้องเรียนทั้งหมด</div></div>
+    <div class="stat-card"><div class="num">${totalStudents}</div><div class="lbl">นักเรียนทั้งหมด</div></div>
+    <div class="stat-card"><div class="num">${totalSubjects}</div><div class="lbl">รายวิชาที่สร้างไว้</div></div>
+    <div class="stat-card"><div class="num">${attendanceDaysLogged}</div><div class="lbl">วันที่เช็คชื่อสะสม (ทุกห้อง)</div></div>
+  </div>
+
+  <div class="card">
+    <h3>📚 รายวิชา</h3>
+    <div class="row" style="margin-bottom:12px;">
+      ${STATE.subjects.map(sub=>`
+        <span class="chip gold">${esc(sub.name)} <button class="link-btn" style="margin:0;padding:0 0 0 4px;color:#7A5C1E" onclick="deleteSubject('${sub.id}')">✕</button></span>
+      `).join('') || '<span class="hint">ยังไม่มีรายวิชา — เพิ่มรายวิชาแรกของคุณด้านล่าง</span>'}
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="openAddSubjectModal()">+ เพิ่มรายวิชาใหม่</button>
+  </div>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between;">
+      <h3 style="margin:0;">👩‍🎓 จัดการรายชื่อนักเรียน</h3>
+    </div>
+    <div class="class-tabs" style="margin-top:12px;">
+      ${STATE.classNames.map(c=>`<button class="class-tab ${c===cls?'active':''}" onclick="setDashClass('${esc(c)}')">${esc(c)} (${(STATE.roster[c]||[]).length})</button>`).join('')}
+    </div>
+    <div class="row" style="margin-bottom:10px;gap:8px;">
+      <button class="btn btn-outline btn-sm" onclick="openAddStudentModal('${esc(cls)}')">+ เพิ่มนักเรียน</button>
+      <label class="btn btn-outline btn-sm" style="margin:0;">📤 นำเข้าไฟล์ Excel/CSV
+        <input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importRoster(event,'${esc(cls)}')">
+      </label>
+      <span class="hint">ไฟล์ควรมีคอลัมน์: เลขที่, รหัสประจำตัว, คำนำหน้า, ชื่อ, นามสกุล</span>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>เลขที่</th><th>รหัสประจำตัว</th><th>ชื่อ-นามสกุล</th><th>เข้าเรียน %</th><th></th></tr></thead>
+        <tbody>
+        ${roster.map(s=>{
+          const st = stats[s.id]||{total:0,absent:0};
+          const attRate = st.total? Math.round(((st.total-st.absent)/st.total)*100):null;
+          const warn = attRate!==null && attRate < 80;
+          return `<tr>
+            <td>${s.no}</td>
+            <td>${esc(s.id)}</td>
+            <td class="name-cell">${esc(fullName(s))}</td>
+            <td>${attRate===null?'<span class="hint">—</span>':`<span class="${warn?'chip red':'chip green'}">${attRate}%</span>`}</td>
+            <td><button class="link-btn" onclick="deleteStudent('${esc(cls)}','${s.id}')">ลบ</button></td>
+          </tr>`;
+        }).join('') || `<tr><td colspan="5" style="text-align:center;color:var(--ink-soft);padding:20px;">ยังไม่มีนักเรียนในห้องนี้</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  `;
+}
+function setDashClass(c){ UI.dashClass=c; refresh(); }
+
+function openAddSubjectModal(){
+  openModal(`
+    <h3>เพิ่มรายวิชาใหม่</h3>
+    <div class="field" style="margin-bottom:12px;">
+      <label>ชื่อรายวิชา</label>
+      <input class="txt" id="newSubjectName" placeholder="เช่น คณิตศาสตร์ ป.6">
+    </div>
+    <div class="field" style="margin-bottom:16px;">
+      <label>ใช้กับห้องเรียน (เลือกได้หลายห้อง)</label>
+      <div class="row">
+        ${STATE.classNames.map(c=>`<label class="chip"><input type="checkbox" class="subjClassChk" value="${esc(c)}" style="margin-left:4px;"> ${esc(c)}</label>`).join('')}
+      </div>
+    </div>
+    <div class="row" style="justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="addSubject()">บันทึก</button>
+    </div>
+  `);
+}
+function addSubject(){
+  const name = document.getElementById('newSubjectName').value.trim();
+  if(!name){ showToast('กรุณาใส่ชื่อรายวิชา'); return; }
+  const classes = Array.from(document.querySelectorAll('.subjClassChk:checked')).map(el=>el.value);
+  if(classes.length===0){ showToast('กรุณาเลือกอย่างน้อย 1 ห้องเรียน'); return; }
+  const id = uid();
+  STATE.subjects.push({id,name,classes});
+  STATE.assignments[id]=[];
+  saveState(); closeModal(); showToast('เพิ่มรายวิชาแล้ว'); refresh();
+}
+function deleteSubject(id){
+  if(!confirm('ลบรายวิชานี้? ข้อมูลคะแนนที่บันทึกไว้ในรายวิชานี้จะถูกลบด้วย')) return;
+  STATE.subjects = STATE.subjects.filter(s=>s.id!==id);
+  delete STATE.assignments[id]; delete STATE.scores[id]; delete STATE.gradeConfig[id];
+  saveState(); refresh();
+}
+
+function openAddStudentModal(cls){
+  openModal(`
+    <h3>เพิ่มนักเรียน — ${esc(cls)}</h3>
+    <div class="row" style="margin-bottom:10px;">
+      <div class="field"><label>คำนำหน้า</label><select id="stTitle"><option>ด.ช.</option><option>ด.ญ.</option><option>นาย</option><option>นางสาว</option></select></div>
+      <div class="field"><label>เลขที่</label><input class="txt" id="stNo" type="number" style="width:80px;"></div>
+    </div>
+    <div class="field" style="margin-bottom:10px;"><label>ชื่อ</label><input class="txt" id="stFirst"></div>
+    <div class="field" style="margin-bottom:10px;"><label>นามสกุล</label><input class="txt" id="stLast"></div>
+    <div class="field" style="margin-bottom:16px;"><label>รหัสประจำตัวนักเรียน</label><input class="txt" id="stId"></div>
+    <div class="row" style="justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="addStudent('${esc(cls)}')">บันทึก</button>
+    </div>
+  `);
+}
+function addStudent(cls){
+  const title=document.getElementById('stTitle').value;
+  const no=parseInt(document.getElementById('stNo').value)|| ((STATE.roster[cls]||[]).length+1);
+  const first=document.getElementById('stFirst').value.trim();
+  const last=document.getElementById('stLast').value.trim();
+  const id=document.getElementById('stId').value.trim() || uid();
+  if(!first||!last){ showToast('กรุณากรอกชื่อ-นามสกุล'); return; }
+  if(!STATE.roster[cls]) STATE.roster[cls]=[];
+  STATE.roster[cls].push({no,id,title,first,last});
+  saveState(); closeModal(); showToast('เพิ่มนักเรียนแล้ว'); refresh();
+}
+function deleteStudent(cls, id){
+  if(!confirm('ลบนักเรียนคนนี้ออกจากห้อง?')) return;
+  STATE.roster[cls] = (STATE.roster[cls]||[]).filter(s=>s.id!==id);
+  saveState(); refresh();
+}
+function importRoster(evt, cls){
+  const file = evt.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (e)=>{
+    try{
+      const wb = XLSX.read(e.target.result, {type:'binary'});
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
+      let added=0;
+      const existing = STATE.roster[cls]||(STATE.roster[cls]=[]);
+      rows.forEach(r=>{
+        if(!r || r.length<2) return;
+        const maybeNo = r[0];
+        if(typeof maybeNo === 'string' && isNaN(parseInt(maybeNo))) return; // header row
+        // Try to guess columns: no, id, title, first, last  OR no,id,name
+        let no=r[0], id=r[1], title='', first='', last='';
+        if(r.length>=5){ title=r[2]; first=r[3]; last=r[4]; }
+        else if(r.length===4){ title=r[2]; const parts=String(r[3]).trim().split(/\s+/); first=parts[0]||''; last=parts.slice(1).join(' '); }
+        else return;
+        first=String(first).trim(); last=String(last).trim();
+        if(!first) return;
+        if(existing.some(s=>s.id===String(id))) return;
+        existing.push({no:parseInt(no)||existing.length+1, id:String(id), title:String(title).trim(), first, last});
+        added++;
+      });
+      saveState(); showToast(`นำเข้านักเรียนสำเร็จ ${added} คน`); refresh();
+    }catch(err){
+      reader2CSV(e.target.result, cls);
+    }
+  };
+  reader.readAsBinaryString(file);
+  evt.target.value='';
+}
+function reader2CSV(){ showToast('ไม่สามารถอ่านไฟล์ได้ กรุณาตรวจสอบรูปแบบไฟล์'); }
+
+/* =================================================================
+   PAGE: ATTENDANCE
+   ================================================================= */
+function pageAttendance(){
+  if(!UI.attClass) UI.attClass = STATE.classNames[0];
+  const cls = UI.attClass, date = UI.attDate;
+  const roster = STATE.roster[cls]||[];
+  if(!STATE.attendance[cls]) STATE.attendance[cls]={};
+  if(!STATE.attendance[cls][date]) STATE.attendance[cls][date]={};
+  const dayData = STATE.attendance[cls][date];
+  const stats = attendanceStatsForClass(cls);
+
+  const alerts = roster.filter(s=>{
+    const st=stats[s.id]; if(!st||st.total<3) return false;
+    return (st.absent/st.total) > 0.2;
+  });
+
+  return `
+  <div class="page-head">
+    <div><h1>เช็คชื่อ</h1><div class="desc">แตะสถานะของนักเรียนแต่ละคน — ค่าเริ่มต้นจะถูกบันทึกอัตโนมัติ</div></div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between;">
+      <div class="row">
+        <div class="field"><label>ห้องเรียน</label>
+          <select onchange="UI.attClass=this.value;refresh();">
+            ${STATE.classNames.map(c=>`<option value="${esc(c)}" ${c===cls?'selected':''}>${esc(c)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field"><label>วันที่</label>
+          <input type="date" value="${date}" onchange="UI.attDate=this.value;refresh();">
+        </div>
+      </div>
+      <button class="btn btn-gold" onclick="markAllPresent('${esc(cls)}','${date}')">✅ มาครบทั้งหมด</button>
+    </div>
+  </div>
+
+  ${alerts.length? `<div class="card" style="border-color:var(--red);background:var(--red-light);">
+    <h3 style="color:var(--red);">⚠️ แจ้งเตือนการขาดเรียน</h3>
+    ${alerts.map(s=>{
+      const st=stats[s.id]; const pct=Math.round((st.absent/st.total)*100);
+      return `<div style="font-size:13.5px;margin-bottom:4px;">• <b>${esc(fullName(s))}</b> ขาดเรียนแล้ว ${pct}% ของวันที่บันทึก (${st.absent}/${st.total} วัน)</div>`;
+    }).join('')}
+  </div>` : ''}
+
+  <div class="att-list">
+    ${roster.map(s=>{
+      const rec = dayData[s.id] || {status:'', note:''};
+      const st = stats[s.id]||{total:0,absent:0};
+      const pct = st.total? Math.round(((st.total-st.absent)/st.total)*100) : null;
+      return `<div class="att-row" style="flex-wrap:wrap;">
+        <div class="idx">${s.no}</div>
+        <div class="who">
+          <div class="nm">${esc(fullName(s))}</div>
+          <div class="pct ${pct!==null&&pct<80?'warn':''}">${pct===null?'ยังไม่มีข้อมูลสะสม':`เข้าเรียนสะสม ${pct}%`}</div>
+        </div>
+        <div class="status-btns">
+          ${STATUS_DEFS.map(sd=>`<button class="st-btn ${rec.status===sd.key?sd.cls:''}" onclick="setAttendance('${esc(cls)}','${date}','${s.id}','${sd.key}')">${sd.short}</button>`).join('')}
+        </div>
+        ${rec.status && rec.status!=='present' ? `<input class="txt note-input" placeholder="หมายเหตุ (ระบุเหตุผล)" value="${esc(rec.note||'')}" oninput="setAttendanceNote('${esc(cls)}','${date}','${s.id}',this.value)">` : ''}
+      </div>`;
+    }).join('') || `<div class="empty-state"><div class="ic">🧑‍🏫</div>ยังไม่มีนักเรียนในห้องนี้ — ไปที่หน้า “ภาพรวม” เพื่อเพิ่มรายชื่อ</div>`}
+  </div>
+  `;
+}
+function setAttendance(cls,date,sid,status){
+  if(!STATE.attendance[cls]) STATE.attendance[cls]={};
+  if(!STATE.attendance[cls][date]) STATE.attendance[cls][date]={};
+  const cur = STATE.attendance[cls][date][sid] || {status:'',note:''};
+  cur.status = status;
+  STATE.attendance[cls][date][sid]=cur;
+  saveState(); refresh();
+}
+function setAttendanceNote(cls,date,sid,note){
+  if(!STATE.attendance[cls][date][sid]) STATE.attendance[cls][date][sid]={status:'',note:''};
+  STATE.attendance[cls][date][sid].note = note;
+  saveState();
+}
+function markAllPresent(cls,date){
+  if(!STATE.attendance[cls]) STATE.attendance[cls]={};
+  const day = {};
+  (STATE.roster[cls]||[]).forEach(s=>{ day[s.id]={status:'present',note:''}; });
+  STATE.attendance[cls][date]=day;
+  saveState(); showToast('ตั้งค่า "มา" ให้ทุกคนแล้ว'); refresh();
+}
+
+/* =================================================================
+   PAGE: SCORES (assignments)
+   ================================================================= */
+function pageScores(){
+  if(STATE.subjects.length===0){
+    return `<div class="page-head"><div><h1>เก็บคะแนนรายตัวชี้วัด/งานย่อย</h1></div></div>
+    <div class="empty-state"><div class="ic">📝</div>ยังไม่มีรายวิชา<br><button class="btn btn-primary" style="margin-top:14px;" onclick="goTab('dashboard')">ไปเพิ่มรายวิชาที่หน้าภาพรวม</button></div>`;
+  }
+  if(!UI.scoreSubject || !STATE.subjects.find(s=>s.id===UI.scoreSubject)) UI.scoreSubject = STATE.subjects[0].id;
+  const subject = STATE.subjects.find(s=>s.id===UI.scoreSubject);
+  if(!UI.scoreClass || !subject.classes.includes(UI.scoreClass)) UI.scoreClass = subject.classes[0];
+  const cls = UI.scoreClass;
+  const roster = STATE.roster[cls]||[];
+  const assignments = STATE.assignments[subject.id] || (STATE.assignments[subject.id]=[]);
+  if(!STATE.scores[subject.id]) STATE.scores[subject.id]={};
+  if(!STATE.scores[subject.id][cls]) STATE.scores[subject.id][cls]={};
+  const scoreData = STATE.scores[subject.id][cls];
+
+  return `
+  <div class="page-head">
+    <div><h1>เก็บคะแนนรายตัวชี้วัด/งานย่อย</h1><div class="desc">สร้างงาน/แบบทดสอบ แล้วกรอกคะแนนแต่ละคนได้ทันที</div></div>
+    <button class="btn btn-outline" onclick="exportScores('${subject.id}','${esc(cls)}')">📤 Export Excel</button>
+  </div>
+
+  <div class="subject-tabs">
+    ${STATE.subjects.map(s=>`<button class="subject-tab ${s.id===subject.id?'active':''}" onclick="UI.scoreSubject='${s.id}';UI.scoreClass=null;refresh();">${esc(s.name)}</button>`).join('')}
+  </div>
+  <div class="class-tabs">
+    ${subject.classes.map(c=>`<button class="class-tab ${c===cls?'active':''}" onclick="UI.scoreClass='${esc(c)}';refresh();">${esc(c)}</button>`).join('')}
+  </div>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between;">
+      <h3 style="margin:0;">งาน/คะแนนย่อย (${assignments.length})</h3>
+      <button class="btn btn-primary btn-sm" onclick="openAddAssignmentModal('${subject.id}')">+ สร้างงานใหม่</button>
+    </div>
+    ${assignments.length===0? '<div class="hint" style="margin-top:8px;">ยังไม่มีงาน — กด “สร้างงานใหม่” เพื่อเริ่มเก็บคะแนน</div>':''}
+  </div>
+
+  ${assignments.length && roster.length ? `
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr>
+        <th class="name-cell">นักเรียน</th>
+        ${assignments.map(a=>`<th>${esc(a.name)}<br><span style="font-weight:400;opacity:.85;">เต็ม ${a.max}</span> <button onclick="deleteAssignment('${subject.id}','${a.id}')" style="background:none;border:none;color:#fff;opacity:.7;cursor:pointer;">✕</button></th>`).join('')}
+        <th>รวม</th>
+      </tr></thead>
+      <tbody>
+      ${roster.map(s=>{
+        const srow = scoreData[s.id]||{};
+        let sum=0, max=0;
+        assignments.forEach(a=>{ max+=a.max; const v=srow[a.id]; if(v!==undefined && v!=='') sum+=Number(v); });
+        return `<tr>
+          <td class="name-cell">${s.no}. ${esc(fullName(s))}</td>
+          ${assignments.map(a=>{
+            const v = srow[a.id]!==undefined? srow[a.id] : '';
+            return `<td><input type="number" min="0" max="${a.max}" step="0.5" class="score-input" value="${v}" onchange="setScore('${subject.id}','${esc(cls)}','${s.id}','${a.id}',this.value,${a.max})"></td>`;
+          }).join('')}
+          <td><b>${sum}/${max}</b></td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+    </table>
+  </div>` : (roster.length? '' : `<div class="empty-state"><div class="ic">🧑‍🏫</div>ห้อง ${esc(cls)} ยังไม่มีนักเรียน</div>`)}
+  `;
+}
+function openAddAssignmentModal(subjectId){
+  openModal(`
+    <h3>สร้างงาน/แบบทดสอบใหม่</h3>
+    <div class="field" style="margin-bottom:12px;"><label>ชื่องาน</label><input class="txt" id="asgName" placeholder="เช่น ใบงานที่ 3, สอบย่อยบทที่ 2"></div>
+    <div class="field" style="margin-bottom:16px;"><label>คะแนนเต็ม</label><input class="txt" id="asgMax" type="number" value="10" min="1"></div>
+    <div class="row" style="justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="addAssignment('${subjectId}')">บันทึก</button>
+    </div>
+  `);
+}
+function addAssignment(subjectId){
+  const name = document.getElementById('asgName').value.trim();
+  const max = parseFloat(document.getElementById('asgMax').value)||10;
+  if(!name){ showToast('กรุณาใส่ชื่องาน'); return; }
+  if(!STATE.assignments[subjectId]) STATE.assignments[subjectId]=[];
+  STATE.assignments[subjectId].push({id:uid(),name,max});
+  saveState(); closeModal(); refresh();
+}
+function deleteAssignment(subjectId, asgId){
+  if(!confirm('ลบงานนี้และคะแนนที่กรอกไว้ทั้งหมด?')) return;
+  STATE.assignments[subjectId] = STATE.assignments[subjectId].filter(a=>a.id!==asgId);
+  Object.values(STATE.scores[subjectId]||{}).forEach(clsScores=>{
+    Object.values(clsScores).forEach(srow=>{ delete srow[asgId]; });
+  });
+  saveState(); refresh();
+}
+function setScore(subjectId, cls, sid, asgId, val, max){
+  if(!STATE.scores[subjectId]) STATE.scores[subjectId]={};
+  if(!STATE.scores[subjectId][cls]) STATE.scores[subjectId][cls]={};
+  if(!STATE.scores[subjectId][cls][sid]) STATE.scores[subjectId][cls][sid]={};
+  let v = val==='' ? '' : clamp(parseFloat(val)||0, 0, max);
+  STATE.scores[subjectId][cls][sid][asgId] = v;
+  saveState(); refresh();
+}
+function exportScores(subjectId, cls){
+  const subject = STATE.subjects.find(s=>s.id===subjectId);
+  const assignments = STATE.assignments[subjectId]||[];
+  const roster = STATE.roster[cls]||[];
+  const scoreData = (STATE.scores[subjectId]||{})[cls]||{};
+  const rows = [['เลขที่','รหัสประจำตัว','ชื่อ-นามสกุล', ...assignments.map(a=>`${a.name} (เต็ม ${a.max})`), 'รวม']];
+  roster.forEach(s=>{
+    const srow = scoreData[s.id]||{};
+    let sum=0;
+    const cells = assignments.map(a=>{ const v=srow[a.id]; if(v!==undefined&&v!=='') sum+=Number(v); return v===undefined?'':v; });
+    rows.push([s.no, s.id, fullName(s), ...cells, sum]);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, cls.replace(/[\/\\?*\[\]]/g,'-'));
+  XLSX.writeFile(wb, `คะแนน_${subject.name}_${cls}.xlsx`.replace(/\//g,'-'));
+}
+
+/* =================================================================
+   PAGE: GRADES (midterm/final + weighting)
+   ================================================================= */
+function pageGrades(){
+  if(STATE.subjects.length===0){
+    return `<div class="page-head"><div><h1>คะแนนรวมและตัดเกรด</h1></div></div>
+    <div class="empty-state"><div class="ic">📊</div>ยังไม่มีรายวิชา<br><button class="btn btn-primary" style="margin-top:14px;" onclick="goTab('dashboard')">ไปเพิ่มรายวิชาที่หน้าภาพรวม</button></div>`;
+  }
+  if(!UI.gradeSubject || !STATE.subjects.find(s=>s.id===UI.gradeSubject)) UI.gradeSubject = STATE.subjects[0].id;
+  const subject = STATE.subjects.find(s=>s.id===UI.gradeSubject);
+  if(!UI.gradeClass || !subject.classes.includes(UI.gradeClass)) UI.gradeClass = subject.classes[0];
+  const cls = UI.gradeClass;
+  const roster = STATE.roster[cls]||[];
+
+  if(!STATE.gradeConfig[subject.id]) STATE.gradeConfig[subject.id]={};
+  if(!STATE.gradeConfig[subject.id][cls]) STATE.gradeConfig[subject.id][cls] = {collectW:50, midW:20, finalW:30, midMax:20, finalMax:30, midScores:{}, finalScores:{}};
+  const cfg = STATE.gradeConfig[subject.id][cls];
+
+  const assignments = STATE.assignments[subject.id]||[];
+  const scoreData = ((STATE.scores[subject.id]||{})[cls])||{};
+  const asgMaxSum = assignments.reduce((a,x)=>a+x.max,0);
+
+  const weightSum = Number(cfg.collectW)+Number(cfg.midW)+Number(cfg.finalW);
+
+  return `
+  <div class="page-head">
+    <div><h1>คะแนนรวมและตัดเกรด</h1><div class="desc">กำหนดสัดส่วนคะแนน แล้วระบบคำนวณเกรดให้อัตโนมัติ — เหมาะสำหรับใช้บนคอมพิวเตอร์</div></div>
+    <button class="btn btn-outline" onclick="exportGrades('${subject.id}','${esc(cls)}')">📤 Export Excel</button>
+  </div>
+
+  <div class="subject-tabs">
+    ${STATE.subjects.map(s=>`<button class="subject-tab ${s.id===subject.id?'active':''}" onclick="UI.gradeSubject='${s.id}';UI.gradeClass=null;refresh();">${esc(s.name)}</button>`).join('')}
+  </div>
+  <div class="class-tabs">
+    ${subject.classes.map(c=>`<button class="class-tab ${c===cls?'active':''}" onclick="UI.gradeClass='${esc(c)}';refresh();">${esc(c)}</button>`).join('')}
+  </div>
+
+  <div class="card">
+    <h3>สัดส่วนคะแนน (รวมต้องเท่ากับ 100%)</h3>
+    <div class="weight-inputs">
+      <div class="field"><label>คะแนนเก็บ % (ปัจจุบันเก็บได้ ${asgMaxSum} คะแนนจาก ${assignments.length} งาน)</label>
+        <input class="txt" type="number" value="${cfg.collectW}" onchange="setGradeCfg('${subject.id}','${esc(cls)}','collectW',this.value)"></div>
+      <div class="field"><label>สอบกลางภาค % (คะแนนเต็ม)</label>
+        <div class="row"><input class="txt" type="number" style="width:70px" value="${cfg.midW}" onchange="setGradeCfg('${subject.id}','${esc(cls)}','midW',this.value)">
+        <input class="txt" type="number" style="width:70px" value="${cfg.midMax}" onchange="setGradeCfg('${subject.id}','${esc(cls)}','midMax',this.value)"></div></div>
+      <div class="field"><label>สอบปลายภาค % (คะแนนเต็ม)</label>
+        <div class="row"><input class="txt" type="number" style="width:70px" value="${cfg.finalW}" onchange="setGradeCfg('${subject.id}','${esc(cls)}','finalW',this.value)">
+        <input class="txt" type="number" style="width:70px" value="${cfg.finalMax}" onchange="setGradeCfg('${subject.id}','${esc(cls)}','finalMax',this.value)"></div></div>
+    </div>
+    ${weightSum!==100? `<div class="hint" style="color:var(--red);margin-top:8px;">⚠️ สัดส่วนรวมตอนนี้ ${weightSum}% (ควรรวมเป็น 100%)</div>`:`<div class="hint" style="color:var(--green);margin-top:8px;">✓ สัดส่วนรวม 100%</div>`}
+  </div>
+
+  <div class="card" style="padding:0;">
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th class="name-cell">นักเรียน</th>
+          <th>คะแนนเก็บ<br><span style="font-weight:400;">(${cfg.collectW}%)</span></th>
+          <th>กลางภาค /${cfg.midMax}</th>
+          <th>ปลายภาค /${cfg.finalMax}</th>
+          <th>รวม (100)</th>
+          <th>เกรด</th>
+        </tr></thead>
+        <tbody>
+        ${roster.map(s=>{
+          const srow = scoreData[s.id]||{};
+          let collectSum=0;
+          assignments.forEach(a=>{ const v=srow[a.id]; if(v!==undefined&&v!=='') collectSum+=Number(v); });
+          const collectPct = asgMaxSum>0 ? (collectSum/asgMaxSum)*Number(cfg.collectW) : 0;
+          const mid = cfg.midScores[s.id]!==undefined? Number(cfg.midScores[s.id]) : '';
+          const fin = cfg.finalScores[s.id]!==undefined? Number(cfg.finalScores[s.id]) : '';
+          const midPct = mid!==''&&cfg.midMax>0 ? (mid/cfg.midMax)*Number(cfg.midW) : 0;
+          const finPct = fin!==''&&cfg.finalMax>0 ? (fin/cfg.finalMax)*Number(cfg.finalW) : 0;
+          const total = round1(collectPct+midPct+finPct);
+          const g = gradeFor(total);
+          return `<tr>
+            <td class="name-cell">${s.no}. ${esc(fullName(s))}</td>
+            <td>${round1(collectPct)} <span class="hint">(${collectSum}/${asgMaxSum})</span></td>
+            <td><input type="number" min="0" max="${cfg.midMax}" class="score-input" value="${mid}" onchange="setMidFinal('${subject.id}','${esc(cls)}','mid','${s.id}',this.value,${cfg.midMax})"></td>
+            <td><input type="number" min="0" max="${cfg.finalMax}" class="score-input" value="${fin}" onchange="setMidFinal('${subject.id}','${esc(cls)}','final','${s.id}',this.value,${cfg.finalMax})"></td>
+            <td><b>${total}</b></td>
+            <td><span class="grade-pill ${g.css}" title="${g.label}">${g.grade}</span></td>
+          </tr>`;
+        }).join('') || `<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--ink-soft);">ยังไม่มีนักเรียนในห้องนี้</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card">
+    <h3 style="margin-bottom:8px;">เกณฑ์การตัดเกรด</h3>
+    <div class="row">
+      ${GRADE_TABLE.map(g=>`<span class="grade-pill ${g.css}">${g.grade} = ${g.min}%${g.min===80?'+':' ขึ้นไป'} ${g.label}</span>`).join('')}
+    </div>
+  </div>
+  `;
+}
+function setGradeCfg(subjectId, cls, key, val){
+  STATE.gradeConfig[subjectId][cls][key] = parseFloat(val)||0;
+  saveState(); refresh();
+}
+function setMidFinal(subjectId, cls, which, sid, val, max){
+  const cfg = STATE.gradeConfig[subjectId][cls];
+  const target = which==='mid' ? cfg.midScores : cfg.finalScores;
+  if(val===''){ delete target[sid]; } else { target[sid] = clamp(parseFloat(val)||0,0,max); }
+  saveState(); refresh();
+}
+function exportGrades(subjectId, cls){
+  const subject = STATE.subjects.find(s=>s.id===subjectId);
+  const cfg = STATE.gradeConfig[subjectId][cls];
+  const assignments = STATE.assignments[subjectId]||[];
+  const asgMaxSum = assignments.reduce((a,x)=>a+x.max,0);
+  const scoreData = ((STATE.scores[subjectId]||{})[cls])||{};
+  const roster = STATE.roster[cls]||[];
+  const rows = [['เลขที่','รหัสประจำตัว','ชื่อ-นามสกุล',`คะแนนเก็บ (${cfg.collectW}%)`,`กลางภาค /${cfg.midMax}`,`ปลายภาค /${cfg.finalMax}`,'รวม (100)','เกรด']];
+  roster.forEach(s=>{
+    const srow = scoreData[s.id]||{};
+    let collectSum=0;
+    assignments.forEach(a=>{ const v=srow[a.id]; if(v!==undefined&&v!=='') collectSum+=Number(v); });
+    const collectPct = asgMaxSum>0 ? (collectSum/asgMaxSum)*Number(cfg.collectW) : 0;
+    const mid = cfg.midScores[s.id]!==undefined? Number(cfg.midScores[s.id]) : '';
+    const fin = cfg.finalScores[s.id]!==undefined? Number(cfg.finalScores[s.id]) : '';
+    const midPct = mid!==''&&cfg.midMax>0 ? (mid/cfg.midMax)*Number(cfg.midW) : 0;
+    const finPct = fin!==''&&cfg.finalMax>0 ? (fin/cfg.finalMax)*Number(cfg.finalW) : 0;
+    const total = round1(collectPct+midPct+finPct);
+    const g = gradeFor(total);
+    rows.push([s.no, s.id, fullName(s), round1(collectPct), mid, fin, total, g.grade]);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, cls.replace(/[\/\\?*\[\]]/g,'-'));
+  XLSX.writeFile(wb, `ตัดเกรด_${subject.name}_${cls}.xlsx`.replace(/\//g,'-'));
+}
+
+/* =================================================================
+   PAGE: BEHAVIOR
+   ================================================================= */
+function pageBehavior(){
+  if(!UI.behClass) UI.behClass = STATE.classNames[0];
+  const cls = UI.behClass;
+  const roster = STATE.roster[cls]||[];
+  if(!STATE.behavior[cls]) STATE.behavior[cls]={};
+
+  return `
+  <div class="page-head">
+    <div><h1>พฤติกรรมและการทำความดี</h1><div class="desc">บันทึกคะแนนจิตพิสัยด้วยหลักฐาน ไม่ต้องใช้ความรู้สึก</div></div>
+  </div>
+  <div class="class-tabs">
+    ${STATE.classNames.map(c=>`<button class="class-tab ${c===cls?'active':''}" onclick="UI.behClass='${esc(c)}';refresh();">${esc(c)}</button>`).join('')}
+  </div>
+
+  ${roster.map(s=>{
+    const log = STATE.behavior[cls][s.id]||[];
+    const total = log.reduce((a,e)=>a+e.delta,0);
+    const cls2 = total>0?'pos':(total<0?'neg':'zero');
+    return `<div class="beh-row">
+      <div class="beh-top">
+        <div class="nm">${s.no}. ${esc(fullName(s))}</div>
+        <div class="beh-score ${cls2}">${total>0?'+':''}${total}</div>
+      </div>
+      <div class="reason-chips">
+        ${BEHAVIOR_REASONS.map(r=>`<button class="reason-chip ${r.delta>0?'plus':'minus'}" onclick="addBehavior('${esc(cls)}','${s.id}','${esc(r.label)}',${r.delta})">${r.delta>0?'+':''}${r.delta} ${esc(r.label)}</button>`).join('')}
+        <button class="reason-chip" onclick="openCustomBehaviorModal('${esc(cls)}','${s.id}')">✏️ อื่นๆ...</button>
+      </div>
+      ${log.length? `<div class="beh-log">${log.slice().reverse().slice(0,5).map(e=>`<div class="entry"><span>${e.delta>0?'+':''}${e.delta} ${esc(e.reason)}</span><span>${fmtDateTH(e.date)} <button class="link-btn" style="padding:0;" onclick="removeBehavior('${esc(cls)}','${s.id}','${e.id}')">ลบ</button></span></div>`).join('')}</div>` : ''}
+    </div>`;
+  }).join('') || `<div class="empty-state"><div class="ic">⭐</div>ห้อง ${esc(cls)} ยังไม่มีนักเรียน</div>`}
+  `;
+}
+function addBehavior(cls, sid, reason, delta){
+  if(!STATE.behavior[cls]) STATE.behavior[cls]={};
+  if(!STATE.behavior[cls][sid]) STATE.behavior[cls][sid]=[];
+  STATE.behavior[cls][sid].push({id:uid(), reason, delta, date:todayStr()});
+  saveState(); refresh();
+}
+function removeBehavior(cls, sid, entryId){
+  STATE.behavior[cls][sid] = STATE.behavior[cls][sid].filter(e=>e.id!==entryId);
+  saveState(); refresh();
+}
+function openCustomBehaviorModal(cls, sid){
+  openModal(`
+    <h3>บันทึกพฤติกรรมอื่นๆ</h3>
+    <div class="field" style="margin-bottom:12px;"><label>รายละเอียด</label><input class="txt" id="behReason" placeholder="ระบุพฤติกรรม"></div>
+    <div class="field" style="margin-bottom:16px;"><label>คะแนน (+ หรือ -)</label><input class="txt" id="behDelta" type="number" value="1"></div>
+    <div class="row" style="justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="submitCustomBehavior('${esc(cls)}','${sid}')">บันทึก</button>
+    </div>
+  `);
+}
+function submitCustomBehavior(cls, sid){
+  const reason = document.getElementById('behReason').value.trim();
+  const delta = parseFloat(document.getElementById('behDelta').value)||0;
+  if(!reason){ showToast('กรุณาระบุรายละเอียด'); return; }
+  addBehavior(cls, sid, reason, delta);
+  closeModal();
+}
+
+/* ================= Modal ================= */
+function openModal(html){
+  const bd = document.createElement('div');
+  bd.className='modal-backdrop'; bd.id='modalBackdrop';
+  bd.onclick=(e)=>{ if(e.target===bd) closeModal(); };
+  bd.innerHTML = `<div class="modal">${html}</div>`;
+  document.body.appendChild(bd);
+}
+function closeModal(){ const m=document.getElementById('modalBackdrop'); if(m) m.remove(); }
+
+/* ================= Init ================= */
+async function init(){
+  document.getElementById('app').innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#1B3A6B;font-family:'Kanit';">กำลังโหลดข้อมูล...</div>`;
+  await loadState();
+  renderShell();
+}
+init();
+
+</script>
+</body>
+</html>
